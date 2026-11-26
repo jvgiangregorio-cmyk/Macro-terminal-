@@ -1,0 +1,71 @@
+name: Refresh market data
+
+on:
+  schedule:
+    # Every 30 minutes (UTC). GitHub may start runs a few minutes late.
+    # The script itself decides whether to ask Twelve Data for prices
+    # (weekdays 06:00-21:59 UTC only) to stay inside the free plan.
+    - cron: "15,45 * * * *"
+  workflow_dispatch:      # adds a "Run workflow" button on the Actions tab
+  push:
+    branches: [main]
+    paths-ignore: ["docs/data/**"]
+
+permissions:
+  contents: write   # to save the new data files
+  pages: write      # to publish the website
+  id-token: write
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch fresh data
+        env:
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python scripts/refresh.py ${{ github.event_name == 'workflow_dispatch' && '--all' || '' }}
+
+      - name: Save data if it changed
+        id: save
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/data
+          if git diff --cached --quiet; then
+            echo "No new data."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -q -m "Refresh market data"
+            for i in 1 2 3; do git pull -q --rebase && git push -q && break; sleep 5; done
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Prepare website
+        if: steps.save.outputs.changed == 'true' || github.event_name != 'schedule'
+        uses: actions/configure-pages@v5
+
+      - name: Upload website
+        if: steps.save.outputs.changed == 'true' || github.event_name != 'schedule'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Publish website
+        id: deploy
+        if: steps.save.outputs.changed == 'true' || github.event_name != 'schedule'
+        uses: actions/deploy-pages@v4

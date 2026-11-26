@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Macro Terminal</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f4f4f1;--panel:#ffffff;--line:#e2e2dc;--grid:#ececE7;
+  --text:#191919;--muted:#666666;--faint:#8a8a85;
+  --accent:#257de0;--s1:#257de0;--s2:#f47230;--s3:#00b894;
+  --up:#008a17;--down:#d63a3b;--warn-bg:#fff4d6;--warn:#7a5300;
+  --hover:#f0f4fa;--sel:#e6effb;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#111111;--panel:#191919;--line:#2c2c2c;--grid:#262626;
+    --text:#efefef;--muted:#9c9c9c;--faint:#7a7a7a;
+    --accent:#338ced;--s1:#338ced;--s2:#e76624;--s3:#00a888;
+    --up:#0aac23;--down:#eb6263;--warn-bg:#3a2e10;--warn:#f2c46b;
+    --hover:#202631;--sel:#1d2a3d;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#111111;--panel:#191919;--line:#2c2c2c;--grid:#262626;
+  --text:#efefef;--muted:#9c9c9c;--faint:#7a7a7a;
+  --accent:#338ced;--s1:#338ced;--s2:#e76624;--s3:#00a888;
+  --up:#0aac23;--down:#eb6263;--warn-bg:#3a2e10;--warn:#f2c46b;
+  --hover:#202631;--sel:#1d2a3d;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.45 "IBM Plex Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.mono,.num{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+a{color:var(--accent)}
+.wrap{max-width:1440px;margin:0 auto;padding:16px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 20px;margin-bottom:14px}
+h1{font:600 18px/1.2 "IBM Plex Mono",monospace;letter-spacing:.04em;margin:0;text-transform:uppercase}
+.stamp{color:var(--muted);font-size:12.5px}
+.stamp b{color:var(--text);font-weight:500}
+.hdr-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+button{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer}
+button:hover{background:var(--hover)}
+button[aria-pressed="true"]{background:var(--sel);border-color:var(--accent)}
+.banner{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px}
+.banner ul{margin:4px 0 0;padding-left:18px}
+.grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+.panel h2{font:600 11.5px/1 "IBM Plex Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;display:flex;justify-content:space-between;gap:8px}
+.panel h2 span{font-weight:400;letter-spacing:0;text-transform:none}
+.markets{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:14px}
+table{width:100%;border-collapse:collapse}
+td,th{padding:5px 4px;text-align:right;white-space:nowrap}
+th{font-weight:500;color:var(--faint);font-size:11.5px;border-bottom:1px solid var(--line)}
+td:first-child,th:first-child{text-align:left;white-space:normal}
+tr.row{cursor:pointer;border-bottom:1px solid var(--grid)}
+tr.row:last-child{border-bottom:0}
+tr.row:hover{background:var(--hover)}
+tr.row.sel{background:var(--sel)}
+tr.row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.nm{font-size:13px;line-height:1.25}
+.sym{display:block;color:var(--faint);font:11px "IBM Plex Mono",monospace}
+.chg{font-size:12.5px}
+.arrow{font-size:9px;margin-right:3px}
+.up .arrow{color:var(--up)} .down .arrow{color:var(--down)}
+.stale{color:var(--faint);font-size:11px}
+.err{color:var(--faint);font-size:11.5px}
+svg text{fill:var(--muted);font:11px "IBM Plex Mono",monospace}
+.spark{display:block}
+.spark path{stroke:var(--muted);fill:none;stroke-width:1.25}
+/* main chart */
+.main-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin-bottom:6px}
+.main-title{font-size:16px;font-weight:600}
+.main-val{font:500 22px "IBM Plex Mono",monospace}
+.ranges{margin-left:auto;display:flex;gap:4px}
+.ranges button{padding:2px 8px;font-size:12px}
+.chart{position:relative;height:300px}
+.chart svg{display:block;width:100%;height:100%}
+.chart .gridline{stroke:var(--grid);stroke-width:1}
+.chart .axis{stroke:var(--line)}
+.chart .series{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.chart .xhair{stroke:var(--faint);stroke-width:1;stroke-dasharray:2 3}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font:12px "IBM Plex Mono",monospace;box-shadow:0 2px 8px rgba(0,0,0,.12);white-space:nowrap;display:none;z-index:2}
+.tip .k{color:var(--muted)}
+.tip .sw{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+details.tbl{margin-top:8px;font-size:12.5px;color:var(--muted)}
+details.tbl table{margin-top:6px;max-width:360px}
+/* economy */
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.tile{border:1px solid var(--line);border-radius:8px;padding:10px;cursor:pointer;background:transparent;text-align:left}
+.tile:hover{background:var(--hover)}
+.tile.sel{background:var(--sel);border-color:var(--accent)}
+.tile .t{font-size:12px;color:var(--muted)}
+.tile .v{font:500 20px "IBM Plex Mono",monospace;margin:2px 0}
+.tile .p{font-size:11.5px;color:var(--faint)}
+/* news */
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.chips button{font-size:12px;padding:2px 9px;border-radius:999px}
+.news{list-style:none;margin:0;padding:0;max-height:620px;overflow:auto}
+.news li{padding:8px 0;border-bottom:1px solid var(--grid)}
+.news li:last-child{border-bottom:0}
+.news a{color:var(--text);text-decoration:none}
+.news a:hover{text-decoration:underline}
+.news .meta{display:block;font-size:11.5px;color:var(--faint);margin-top:2px}
+.empty{color:var(--faint);font-size:13px;padding:8px 0}
+footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
+@media (max-width:1100px){.grid{grid-template-columns:1fr}}
+@media (max-width:520px){.chart{height:240px}.ranges{margin-left:0}.hdr-right{margin-left:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Macro Terminal</h1>
+    <div class="stamp" id="stamps">Loading data…</div>
+    <div class="hdr-right">
+      <button id="themeBtn" type="button" title="Switch light or dark">◐ Theme</button>
+    </div>
+  </header>
+  <div id="banner"></div>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel" aria-label="Selected chart">
+        <div class="main-head">
+          <div class="main-title" id="mainTitle">—</div>
+          <div class="main-val" id="mainVal"></div>
+          <div class="chg" id="mainChg"></div>
+          <div class="ranges" id="ranges" role="group" aria-label="Time range"></div>
+        </div>
+        <div class="chart" id="mainChart" tabindex="0" aria-label="Price chart. Use left and right arrow keys to read values."></div>
+        <details class="tbl"><summary>Show recent values as a table</summary><div id="mainTable"></div></details>
+      </section>
+
+      <div class="markets" id="markets"></div>
+
+      <section class="panel">
+        <h2>Economy <span>click a tile to chart it</span></h2>
+        <div class="tiles" id="econ"></div>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="panel">
+        <h2>US Treasury yield curve <span id="curveAsOf"></span></h2>
+        <div class="chart" id="curveChart" style="height:210px" tabindex="0" aria-label="Yield curve chart"></div>
+        <div class="legend" id="curveLegend"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Rates &amp; credit <span>daily change</span></h2>
+        <table id="rates"></table>
+      </section>
+
+      <section class="panel">
+        <h2>Headlines <span id="newsAsOf"></span></h2>
+        <div class="chips" id="chips"></div>
+        <ul class="news" id="news"></ul>
+      </section>
+    </div>
+  </div>
+
+  <footer>
+    Prices: Twelve Data (refreshed about every 30 minutes on weekdays, may be delayed). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Headlines: publishers' RSS feeds.
+    This page reloads its data every 5 minutes. Not investment advice.
+  </footer>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const SVGNS = "http://www.w3.org/2000/svg";
+const sv = (tag, attrs) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); return e; };
+
+let D = { prices: null, hist: null, fred: null, news: null };
+let selected = { kind: "td", id: "SPY" };
+let range = "1Y";
+let newsFilter = "All";
+const RANGES = { "1M": 31, "3M": 92, "6M": 183, "1Y": 366, "2Y": 731, "5Y": 1827, "Max": 99999 };
+
+// ---------- theme
+try { const t = localStorage.getItem("mt-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+$("themeBtn").onclick = () => {
+  const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const next = cur === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("mt-theme", next); } catch (e) {}
+  renderAll();
+};
+
+// ---------- formatting
+const fmt = (v, d) => v == null || isNaN(v) ? "—" : v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+function priceDigits(sym, v) {
+  if (/JPY|CNY/.test(sym)) return 3;
+  if (/\//.test(sym) && !/XAU|XAG|BTC|WTI/.test(sym)) return 4;
+  if (v >= 10000) return 0;
+  return 2;
+}
+function fmtFred(s, v) {
+  if (v == null) return "—";
+  if (s.unit === "k") return (v > 0 ? "+" : "") + fmt(v, 0) + "k";
+  if (s.id === "ICSA") return fmt(v / 1000, 0) + "k";
+  if (s.unit === "$") return "$" + fmt(v, 2);
+  if (s.unit === "") return fmt(v, s.id === "DTWEXBGS" ? 1 : 2);
+  return fmt(v, 2) + (s.unit === "pp" ? "" : "%");
+}
+const isPct = s => s.unit === "%" || s.unit === "pp";
+function relTime(iso) {
+  if (!iso) return "";
+  const m = Math.round((Date.now() - new Date(iso)) / 60000);
+  if (m < 1) return "just now"; if (m < 60) return m + " min ago";
+  const h = Math.round(m / 60); if (h < 36) return h + " h ago";
+  return Math.round(h / 24) + " days ago";
+}
+const localTime = iso => iso ? new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
+
+function chgNode(v, text) {
+  const s = el("span", "chg num " + (v > 0 ? "up" : v < 0 ? "down" : ""));
+  if (v == null || isNaN(v)) { s.textContent = "—"; return s; }
+  s.append(el("span", "arrow", v > 0 ? "▲" : v < 0 ? "▼" : "■"), document.createTextNode(text));
+  return s;
+}
+
+// ---------- data access
+function fredSeries(id) { const s = D.fred && D.fred.series[id]; return s ? Object.assign({ id }, s) : null; }
+function valueAt(obs, daysBack) {
+  if (!obs || !obs.length) return null;
+  const last = new Date(obs[obs.length - 1][0]);
+  const target = new Date(last - daysBack * 864e5).toISOString().slice(0, 10);
+  for (let i = obs.length - 1; i >= 0; i--) if (obs[i][0] <= target) return obs[i];
+  return null;
+}
+function selectedSeries() {
+  if (selected.kind === "td") {
+    const q = (D.prices && D.prices.quotes || []).find(q => q.symbol === selected.id);
+    const pts = (D.hist && D.hist.series[selected.id] || []).slice();
+    // add today's live price as the last point when it is newer
+    if (q && q.price != null && q.as_of) {
+      const day = q.as_of.slice(0, 10);
+      if (pts.length && pts[pts.length - 1][0] === day) pts[pts.length - 1] = [day, q.price];
+      else if (!pts.length || pts[pts.length - 1][0] < day) pts.push([day, q.price]);
+    }
+    return { title: q ? q.name : selected.id, sub: selected.id, pts, digits: priceDigits(selected.id, q && q.price || (pts.at(-1) || [0, 0])[1]),
+             last: q && q.price, chg: q && q.pct, chgText: q && q.pct != null ? (q.pct > 0 ? "+" : "") + fmt(q.pct, 2) + "% today" : "", unit: "" };
+  }
+  const s = fredSeries(selected.id);
+  if (!s) return { title: selected.id, pts: [] };
+  const o = s.obs, last = o.at(-1), prev = o.at(-2);
+  const d = last && prev ? last[1] - prev[1] : null;
+  let chgText = "";
+  if (d != null) chgText = s.group === "Economy" ? "prior " + fmtFred(s, prev[1])
+    : isPct(s) ? (d > 0 ? "+" : "") + fmt(d * 100, 0) + " bp" : (d > 0 ? "+" : "") + fmt(d, 2);
+  return { title: s.name, sub: "FRED " + s.id + (last ? " · " + last[0] : ""), pts: o, fred: s, last: last && last[1],
+           chg: s.group === "Economy" ? null : d, chgText };
+}
+
+// ---------- sparkline
+function spark(pts, w = 64, h = 22) {
+  const svg = sv("svg", { width: w, height: h, viewBox: `0 0 ${w} ${h}`, class: "spark", "aria-hidden": "true" });
+  if (!pts || pts.length < 2) return svg;
+  const v = pts.map(p => p[1]), lo = Math.min(...v), hi = Math.max(...v), span = hi - lo || 1;
+  const d = v.map((y, i) => (i ? "L" : "M") + (i / (v.length - 1) * (w - 2) + 1).toFixed(1) + "," + (h - 2 - (y - lo) / span * (h - 4)).toFixed(1)).join("");
+  svg.append(sv("path", { d }));
+  return svg;
+}
+
+// ---------- tooltip
+const tip = $("tip");
+function showTip(container, x, y, rows) {
+  tip.replaceChildren(...rows);
+  tip.style.display = "block";
+  const r = container.getBoundingClientRect();
+  let left = r.left + window.scrollX + x + 14, top = r.top + window.scrollY + y - 10;
+  const tw = tip.offsetWidth;
+  if (left + tw > window.scrollX + document.documentElement.clientWidth - 8) left = r.left + window.scrollX + x - tw - 14;
+  tip.style.left = left + "px"; tip.style.top = top + "px";
+}
+const hideTip = () => { tip.style.display = "none"; };
+
+function niceTicks(lo, hi, n = 5) {
+  const span = hi - lo || Math.abs(hi) || 1, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= step0);
+  const out = []; for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) out.push(+t.toFixed(10));
+  return { ticks: out, step };
+}
+const tickDigits = step => Math.max(0, Math.min(4, -Math.floor(Math.log10(step) + 1e-9)));
+
+// ---------- main time-series chart
+function drawMain() {
+  const S = selectedSeries();
+  $("mainTitle").replaceChildren(document.createTextNode(S.title + " "), el("span", "sym", S.sub || ""));
+  $("mainTitle").querySelector(".sym").style.display = "inline";
+  $("mainVal").textContent = S.fred ? fmtFred(S.fred, S.last) : fmt(S.last, S.digits);
+  $("mainChg").replaceChildren(!S.chgText ? "" : S.chg == null ? el("span", "chg stale", S.chgText) : chgNode(S.chg, S.chgText));
+  const box = $("mainChart"); box.replaceChildren();
+  let pts = S.pts || [];
+  if (pts.length) {
+    const end = new Date(pts.at(-1)[0]), cut = new Date(end - RANGES[range] * 864e5).toISOString().slice(0, 10);
+    pts = pts.filter(p => p[0] >= cut);
+  }
+  // table view
+  const tb = el("table"); const hr = el("tr"); hr.append(el("th", "", "Date"), el("th", "", "Value")); tb.append(hr);
+  pts.slice(-25).reverse().forEach(p => { const r = el("tr"); r.append(el("td", "num", p[0]), el("td", "num", S.fred ? fmtFred(S.fred, p[1]) : fmt(p[1], S.digits))); tb.append(r); });
+  $("mainTable").replaceChildren(tb);
+  if (pts.length < 2) { box.append(el("div", "empty", "No history yet for this series. It appears after the first daily download.")); return; }
+  lineChart(box, [{ name: S.title, pts, color: "var(--s1)" }], {
+    fmtY: v => S.fred ? fmtFred(S.fred, v) : fmt(v, S.digits),
+    xLabels: "date",
+  });
+}
+
+function lineChart(box, series, opt) {
+  const W = box.clientWidth || 600, H = box.clientHeight || 300;
+  const m = { l: 8, r: 58, t: 10, b: 24 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const all = series.flatMap(s => s.pts.map(p => p[1]));
+  let lo = Math.min(...all), hi = Math.max(...all); const pad = (hi - lo) * 0.06 || Math.abs(hi) * 0.01 || 1; lo -= pad; hi += pad;
+  const { ticks, step } = niceTicks(lo, hi, 5);
+  const n = series[0].pts.length;
+  const X = opt.xLabels === "date" ? i => m.l + i / (n - 1) * iw : i => m.l + (n === 1 ? iw / 2 : i / (n - 1) * iw);
+  const Y = v => m.t + (1 - (v - lo) / (hi - lo)) * ih;
+  const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": series.map(s => s.name).join(", ") });
+  ticks.forEach(t => {
+    svg.append(sv("line", { x1: m.l, x2: m.l + iw, y1: Y(t), y2: Y(t), class: "gridline" }));
+    const tx = sv("text", { x: m.l + iw + 6, y: Y(t) + 4 }); tx.textContent = opt.fmtTick ? opt.fmtTick(t) : t.toLocaleString("en-US", { minimumFractionDigits: tickDigits(step), maximumFractionDigits: tickDigits(step) }); svg.append(tx);
+  });
+  svg.append(sv("line", { x1: m.l, x2: m.l + iw, y1: m.t + ih, y2: m.t + ih, class: "axis" }));
+  // x labels
+  if (opt.xLabels === "date") {
+    const pts = series[0].pts, first = new Date(pts[0][0]), last = new Date(pts.at(-1)[0]);
+    const spanDays = (last - first) / 864e5, nLab = Math.max(2, Math.floor(iw / 90));
+    let lastX = -1e9;
+    for (let k = 0; k < nLab; k++) {
+      const i = Math.round(k / (nLab - 1) * (n - 1)), d = new Date(pts[i][0] + "T00:00:00Z"), x = X(i);
+      if (x - lastX < 70) continue; lastX = x;
+      const lab = spanDays > 400 ? d.toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" }) : d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+      const tx = sv("text", { x, y: H - 6, "text-anchor": k === 0 ? "start" : k === nLab - 1 ? "end" : "middle" }); tx.textContent = lab; svg.append(tx);
+    }
+  } else {
+    opt.xLabels.forEach((lab, i) => { const tx = sv("text", { x: X(i), y: H - 6, "text-anchor": i === 0 ? "start" : i === n - 1 ? "end" : "middle" }); tx.textContent = lab; svg.append(tx); });
+  }
+  series.forEach(s => {
+    const d = s.pts.map((p, i) => p[1] == null ? "" : (i && s.pts[i - 1][1] != null ? "L" : "M") + X(i).toFixed(1) + "," + Y(p[1]).toFixed(1)).join("");
+    svg.append(sv("path", { d, class: "series", style: `stroke:${s.color}` }));
+    if (opt.dots) s.pts.forEach((p, i) => p[1] != null && svg.append(sv("circle", { cx: X(i), cy: Y(p[1]), r: 4, fill: s.color, stroke: "var(--panel)", "stroke-width": 2 })));
+  });
+  const xh = sv("line", { y1: m.t, y2: m.t + ih, class: "xhair", visibility: "hidden" }); svg.append(xh);
+  const dots = series.map(s => { const c = sv("circle", { r: 4.5, fill: s.color, stroke: "var(--panel)", "stroke-width": 2, visibility: "hidden" }); svg.append(c); return c; });
+  const hit = sv("rect", { x: m.l, y: m.t, width: iw, height: ih, fill: "transparent" }); svg.append(hit);
+  box.append(svg);
+  let cur = -1;
+  const show = i => {
+    cur = i = Math.max(0, Math.min(n - 1, i));
+    const x = X(i); xh.setAttribute("x1", x); xh.setAttribute("x2", x); xh.setAttribute("visibility", "visible");
+    const rows = [el("div", "k", opt.xLabels === "date" ? new Date(series[0].pts[i][0] + "T00:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : opt.xLabels[i])];
+    series.forEach((s, j) => {
+      const v = s.pts[i] && s.pts[i][1];
+      if (v == null) { dots[j].setAttribute("visibility", "hidden"); return; }
+      dots[j].setAttribute("cx", x); dots[j].setAttribute("cy", Y(v)); dots[j].setAttribute("visibility", "visible");
+      const r = el("div"); if (series.length > 1) { const sw = el("span", "sw"); sw.style.background = s.color; r.append(sw, document.createTextNode(s.name + "  ")); }
+      r.append(document.createTextNode(opt.fmtY(v))); rows.push(r);
+    });
+    showTip(box, x * box.clientWidth / W, Y(series[0].pts[i][1] ?? lo) * box.clientHeight / H, rows);
+  };
+  const hide = () => { xh.setAttribute("visibility", "hidden"); dots.forEach(d => d.setAttribute("visibility", "hidden")); hideTip(); cur = -1; };
+  hit.addEventListener("pointermove", e => { const r = box.getBoundingClientRect(); const x = (e.clientX - r.left) * W / r.width; show(Math.round((x - m.l) / iw * (n - 1))); });
+  hit.addEventListener("pointerleave", hide);
+  box.onkeydown = e => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); show(cur < 0 ? n - 1 : cur + (e.key === "ArrowRight" ? 1 : -1)); } else if (e.key === "Escape") hide(); };
+  box.onblur = hide;
+}
+
+// ---------- market tables
+function drawMarkets() {
+  const wrap = $("markets"); wrap.replaceChildren();
+  const quotes = D.prices && D.prices.quotes || [];
+  ["Equities", "FX", "Commodities"].forEach(g => {
+    const p = el("section", "panel"); const h = el("h2", "", g === "Commodities" ? "Commodities & crypto" : g === "FX" ? "Currencies" : "Equities (ETFs)"); p.append(h);
+    const t = el("table"); const hr = el("tr"); ["", "Last", "Today", "1Y"].forEach(x => hr.append(el("th", "", x))); t.append(hr);
+    const qs = quotes.filter(q => q.group === g);
+    if (!qs.length) { p.append(el("div", "empty", "Waiting for the first price refresh.")); wrap.append(p); return; }
+    qs.forEach(q => {
+      const r = el("tr", "row" + (selected.kind === "td" && selected.id === q.symbol ? " sel" : "")); r.tabIndex = 0;
+      const c0 = el("td"); c0.append(el("span", "nm", q.name), el("span", "sym", q.symbol)); r.append(c0);
+      if (q.price == null) { const c = el("td", "err", "unavailable"); c.colSpan = 3; c.title = q.error || ""; r.append(c); }
+      else {
+        r.append(el("td", "num", fmt(q.price, priceDigits(q.symbol, q.price))));
+        const c2 = el("td"); c2.append(chgNode(q.pct, (q.pct > 0 ? "+" : "") + fmt(q.pct, 2) + "%")); if (q.error) { c2.append(el("span", "stale", " old")); c2.title = "Latest refresh failed: " + q.error; } r.append(c2);
+        const c3 = el("td"); c3.append(spark((D.hist && D.hist.series[q.symbol] || []).slice(-252))); r.append(c3);
+      }
+      const pick = () => { selected = { kind: "td", id: q.symbol }; renderAll(); };
+      r.onclick = pick; r.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
+      t.append(r);
+    });
+    p.append(t); wrap.append(p);
+  });
+}
+
+// ---------- rates table
+const RATE_ROWS = ["DFF", "SOFR", "DGS3MO", "DGS2", "DGS5", "DGS10", "DGS30", "T10Y2Y", "DFII10", "T10YIE", "MORTGAGE30US", "BAMLC0A0CM", "BAMLH0A0HYM2", "VIXCLS", "DTWEXBGS", "DCOILBRENTEU", "DHHNGSP"];
+function drawRates() {
+  const t = $("rates"); t.replaceChildren();
+  const hr = el("tr"); ["", "Latest", "Chg", "1Y"].forEach(x => hr.append(el("th", "", x))); t.append(hr);
+  if (!D.fred) { const r = el("tr"); const c = el("td", "empty", "Waiting for the first FRED refresh."); c.colSpan = 4; r.append(c); t.append(r); return; }
+  RATE_ROWS.forEach(id => {
+    const s = fredSeries(id); if (!s || !s.obs.length) return;
+    const last = s.obs.at(-1), prev = s.obs.at(-2), d = prev ? last[1] - prev[1] : null;
+    const r = el("tr", "row" + (selected.kind === "fred" && selected.id === id ? " sel" : "")); r.tabIndex = 0;
+    const c0 = el("td"); c0.append(el("span", "nm", s.name), el("span", "sym", id + " · " + last[0].slice(5))); r.append(c0);
+    r.append(el("td", "num", fmtFred(s, last[1])));
+    const c2 = el("td");
+    c2.append(chgNode(d, d == null ? "" : isPct(s) ? (d > 0 ? "+" : "") + fmt(d * 100, 0) + " bp" : (d > 0 ? "+" : "") + fmt(d, 2)));
+    r.append(c2);
+    const c3 = el("td"); c3.append(spark(s.obs.filter(p => p[0] >= valueAt(s.obs, 365)?.[0]))); r.append(c3);
+    const pick = () => { selected = { kind: "fred", id }; renderAll(); };
+    r.onclick = pick; r.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
+    t.append(r);
+  });
+}
+
+// ---------- yield curve
+function drawCurve() {
+  const box = $("curveChart"); box.replaceChildren(); $("curveLegend").replaceChildren();
+  const ids = ["DGS3MO", "DGS2", "DGS5", "DGS10", "DGS30"], labels = ["3M", "2Y", "5Y", "10Y", "30Y"];
+  const ss = ids.map(fredSeries);
+  if (ss.some(s => !s || !s.obs.length)) { box.append(el("div", "empty", "Waiting for the first FRED refresh.")); return; }
+  const lines = [["Latest", 0, "var(--s1)"], ["1 month ago", 30, "var(--s2)"], ["1 year ago", 365, "var(--s3)"]].map(([name, back, color]) => ({
+    name, color, pts: ss.map((s, i) => [labels[i], (back ? valueAt(s.obs, back) : s.obs.at(-1))?.[1] ?? null])
+  }));
+  $("curveAsOf").textContent = "as of " + ss[3].obs.at(-1)[0];
+  lineChart(box, lines, { xLabels: labels, dots: true, fmtY: v => fmt(v, 2) + "%", fmtTick: v => v.toFixed(2) + "%" });
+  lines.forEach(l => { const s = el("span"); const i = el("i"); i.style.background = l.color; s.append(i, document.createTextNode(l.name)); $("curveLegend").append(s); });
+}
+
+// ---------- economy tiles
+const ECON = ["CPIAUCSL", "CPILFESL", "PCEPILFE", "UNRATE", "PAYEMS", "ICSA", "GDPC1"];
+function drawEcon() {
+  const w = $("econ"); w.replaceChildren();
+  if (!D.fred) { w.append(el("div", "empty", "Waiting for the first FRED refresh.")); return; }
+  ECON.forEach(id => {
+    const s = fredSeries(id); if (!s || !s.obs.length) return;
+    const last = s.obs.at(-1), prev = s.obs.at(-2);
+    const b = el("button", "tile" + (selected.kind === "fred" && selected.id === id ? " sel" : "")); b.type = "button";
+    const when = new Date(last[0] + "T00:00:00Z").toLocaleDateString("en-US", id === "GDPC1" ? { month: "short", year: "numeric", timeZone: "UTC" } : id === "ICSA" ? { month: "short", day: "numeric", timeZone: "UTC" } : { month: "short", year: "numeric", timeZone: "UTC" });
+    b.append(el("div", "t", s.name), el("div", "v", fmtFred(s, last[1])), el("div", "p", (id === "GDPC1" ? "Quarter from " : "") + when + (prev ? " · prior " + fmtFred(s, prev[1]) : "")));
+    b.onclick = () => { selected = { kind: "fred", id }; if (RANGES[range] < 1000) range = "5Y"; renderAll(); window.scrollTo({ top: 0, behavior: "smooth" }); };
+    w.append(b);
+  });
+}
+
+// ---------- news
+function drawNews() {
+  const items = D.news && D.news.items || [];
+  const sources = ["All", ...new Set(items.map(i => i.source))];
+  if (!sources.includes(newsFilter)) newsFilter = "All";
+  $("chips").replaceChildren(...sources.map(s => { const b = el("button", "", s); b.type = "button"; b.setAttribute("aria-pressed", s === newsFilter); b.onclick = () => { newsFilter = s; drawNews(); }; return b; }));
+  const ul = $("news"); ul.replaceChildren();
+  const shown = items.filter(i => newsFilter === "All" || i.source === newsFilter).slice(0, 50);
+  if (!shown.length) ul.append(el("li", "empty", "No headlines yet."));
+  shown.forEach(i => {
+    const li = el("li");
+    if (/^https:\/\//.test(i.link)) { const a = el("a", "", i.title); a.href = i.link; a.target = "_blank"; a.rel = "noopener noreferrer"; li.append(a); }
+    else li.append(el("span", "", i.title));
+    li.append(el("span", "meta", i.source + (i.published ? " · " + relTime(i.published) : "")));
+    ul.append(li);
+  });
+  $("newsAsOf").textContent = D.news && D.news.updated ? "updated " + relTime(D.news.updated) : "";
+}
+
+// ---------- header + problems
+function drawHeader() {
+  const s = $("stamps"); s.replaceChildren();
+  const add = (label, iso) => { if (s.childNodes.length) s.append(document.createTextNode("  ·  ")); s.append(document.createTextNode(label + " "), el("b", "", iso ? localTime(iso) : "not yet")); };
+  add("Prices", D.prices && D.prices.updated); add("Rates", D.fred && D.fred.updated); add("History", D.hist && D.hist.updated);
+  const errs = [];
+  [["Twelve Data prices", D.prices], ["Twelve Data history", D.hist], ["FRED", D.fred]].forEach(([n, d]) => (d && d.errors || []).forEach(e => errs.push(n + ": " + e)));
+  const bad = (D.prices && D.prices.quotes || []).filter(q => q.error).map(q => q.symbol);
+  if (bad.length) errs.push("Some symbols could not be refreshed: " + bad.join(", "));
+  const b = $("banner"); b.replaceChildren();
+  if (!D.prices && !D.fred && !D.news) {
+    const box = el("div", "banner", "No data yet. The first automatic refresh fills this page. You can start one now from the repository's Actions tab: Refresh market data, then Run workflow.");
+    b.append(box);
+  } else if (errs.length) {
+    const box = el("div", "banner"); box.append(el("strong", "", "Some data didn't refresh last time.")); const ul = el("ul"); errs.slice(0, 6).forEach(e => ul.append(el("li", "", e))); box.append(ul); b.append(box);
+  }
+}
+
+function drawRanges() {
+  const keys = selected.kind === "fred" ? ["1M", "3M", "6M", "1Y", "2Y", "5Y", "Max"] : ["1M", "3M", "6M", "1Y", "Max"];
+  if (!keys.includes(range)) range = "1Y";
+  $("ranges").replaceChildren(...keys.map(k => { const b = el("button", "", k); b.type = "button"; b.setAttribute("aria-pressed", k === range); b.onclick = () => { range = k; drawRanges(); drawMain(); }; return b; }));
+}
+
+function renderAll() {
+  hideTip();
+  drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawRates(); drawCurve(); drawEcon(); drawNews();
+}
+
+// ---------- loading
+async function getJSON(name) {
+  try { const r = await fetch("data/" + name + "?t=" + Date.now(), { cache: "no-store" }); return r.ok ? await r.json() : null; }
+  catch (e) { return null; }
+}
+async function load() {
+  const [prices, hist, fred, news] = await Promise.all(["prices.json", "price_history.json", "fred.json", "news.json"].map(getJSON));
+  D = { prices: prices || D.prices, hist: hist || D.hist, fred: fred || D.fred, news: news || D.news };
+  renderAll();
+}
+let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderAll, 150); });
+load();
+setInterval(load, 5 * 60 * 1000);
+})();
+</script>
+</body>
+</html>
