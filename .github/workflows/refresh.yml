@@ -26,11 +26,11 @@ jobs:
     timeout-minutes: 15
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url || steps.deploy2.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -67,11 +67,29 @@ jobs:
 
       - name: Upload website
         if: steps.save.outputs.changed == 'true' || github.event_name != 'schedule'
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: docs
 
+      # GitHub's publishing service occasionally hiccups. Try twice, and if both
+      # fail, don't fail the whole run: the data is already saved and the next
+      # run (30 minutes later) publishes it.
       - name: Publish website
         id: deploy
         if: steps.save.outputs.changed == 'true' || github.event_name != 'schedule'
+        continue-on-error: true
         uses: actions/deploy-pages@v4
+
+      - name: Wait before retrying
+        if: steps.deploy.outcome == 'failure'
+        run: sleep 30
+
+      - name: Publish website (second try)
+        id: deploy2
+        if: steps.deploy.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: Note if publishing was skipped
+        if: steps.deploy.outcome == 'failure' && steps.deploy2.outcome == 'failure'
+        run: echo "::warning::GitHub Pages didn't accept the update this time. The data is saved and the next run will publish it."
