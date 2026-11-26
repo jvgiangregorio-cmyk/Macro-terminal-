@@ -158,14 +158,19 @@ def td_call(endpoint, symbols, key, **params):
     """One batched Twelve Data request. Returns {symbol: response} or raises."""
     q = dict(params, symbol=",".join(symbols), apikey=key)
     url = f"https://api.twelvedata.com/{endpoint}?" + urllib.parse.urlencode(q)
-    try:
-        data = get_json(url)
-    except urllib.error.HTTPError as e:
-        if e.code != 429:
-            raise
-        print("  Twelve Data says too many calls this minute; waiting and trying once more")
-        time.sleep(TD_PAUSE)
-        data = get_json(url)
+    for attempt in (1, 2):
+        try:
+            data = get_json(url)
+        except urllib.error.HTTPError as e:
+            if e.code != 429 or attempt == 2:
+                raise
+            data = {"status": "error", "code": 429}
+        limited = isinstance(data, dict) and data.get("status") == "error" and data.get("code") == 429
+        if limited and attempt == 1:
+            print("  Twelve Data says too many calls this minute; waiting and trying once more")
+            time.sleep(TD_PAUSE)
+            continue
+        break
     # A whole-request error (bad key, out of credits) comes back flat.
     if isinstance(data, dict) and data.get("status") == "error" and "code" in data:
         raise RuntimeError(f"Twelve Data error {data.get('code')}: {data.get('message')}")
