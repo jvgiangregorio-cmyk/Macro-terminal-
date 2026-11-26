@@ -464,7 +464,46 @@ def fetch_finnhub_news(key):
     return items
 
 
-def fetch_calendar(key):
+# US data releases worth watching (FRED release names). Finnhub's free plan has no
+# economic calendar, so the release dates come from FRED instead.
+KEY_RELEASES = {
+    "Consumer Price Index": "US CPI inflation",
+    "Employment Situation": "US jobs report (payrolls, unemployment)",
+    "Gross Domestic Product": "US GDP",
+    "Personal Income and Outlays": "US PCE inflation, income & spending",
+    "Producer Price Index": "US PPI (producer prices)",
+    "Advance Monthly Sales for Retail and Food Services": "US retail sales",
+    "Unemployment Insurance Weekly Claims Report": "US jobless claims",
+    "Job Openings and Labor Turnover Survey": "US job openings (JOLTS)",
+    "FOMC Press Release": "Fed rate decision (FOMC)",
+    "G.17 Industrial Production and Capacity Utilization": "US industrial production",
+    "ISM Manufacturing": "ISM manufacturing",
+    "Surveys of Consumers": "UMich consumer sentiment",
+    "New Residential Construction": "US housing starts",
+    "Durable Goods": "US durable goods orders",
+}
+
+
+def fetch_release_dates(fred_key):
+    today = now_utc().date()
+    q = {"api_key": fred_key, "file_type": "json", "realtime_start": today.isoformat(),
+         "realtime_end": (today + dt.timedelta(days=21)).isoformat(),
+         "include_release_dates_with_no_data": "true", "limit": "1000", "sort_order": "asc"}
+    rows = get_json("https://api.stlouisfed.org/fred/releases/dates?" + urllib.parse.urlencode(q))["release_dates"]
+    out = []
+    for r in rows:
+        label = next((v for k, v in KEY_RELEASES.items() if r.get("release_name", "").startswith(k)), None)
+        if label:
+            out.append({"date": r["date"], "event": label, "country": "US"})
+    seen, uniq = set(), []
+    for r in out:
+        if (r["date"], r["event"]) not in seen:
+            seen.add((r["date"], r["event"]))
+            uniq.append(r)
+    return uniq
+
+
+def fetch_calendar(key, fred_key=""):
     print("Finnhub calendars")
     today = now_utc().date()
     frm, to = today - dt.timedelta(days=3), today + dt.timedelta(days=10)
@@ -483,7 +522,6 @@ def fetch_calendar(key):
     except urllib.error.HTTPError as e:
         msg = "not included in Finnhub's free plan" if e.code in (401, 403) else f"HTTP {e.code}"
         print(f"  economic calendar: {msg}")
-        out["notes"].append(f"Economic calendar: {msg}")
         out["economic"] = []
     except Exception as e:  # noqa: BLE001
         print(f"  economic calendar failed: {e}")
@@ -502,6 +540,12 @@ def fetch_calendar(key):
     except Exception as e:  # noqa: BLE001
         print(f"  earnings calendar failed: {e}")
         out["notes"].append(f"Earnings calendar: {e}")
+    if not out["economic"] and fred_key:
+        try:
+            out["releases"] = fetch_release_dates(fred_key)
+            print(f"  US release dates from FRED: {len(out['releases'])}")
+        except Exception as e:  # noqa: BLE001
+            print(f"  FRED release dates failed: {hide_key(str(e), fred_key)}")
     save("calendar.json", dict(out, updated=iso(now_utc()), window=[frm.isoformat(), to.isoformat()]))
 
 
@@ -611,7 +655,7 @@ def main():
     else:
         fh_news = fetch_finnhub_news(fh_key)
         if force or cot_due(t) or load("calendar.json") is None:
-            fetch_calendar(fh_key)
+            fetch_calendar(fh_key, fred_key)
 
     fetch_news(fh_news)
 
