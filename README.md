@@ -10,13 +10,16 @@ A personal markets dashboard (rates, FX, equities, commodities, economic data an
 
 | Data | Source | How often |
 |---|---|---|
-| Stock ETFs, currencies, gold, silver, oil, bitcoin | Twelve Data | every 30 min, weekdays 06:00–22:00 UTC |
+| Currencies, gold, bitcoin | Twelve Data | every 20 min, weekdays 06:00–22:00 UTC |
+| Stock, silver and oil ETFs | Twelve Data | every 15 min while US markets are open |
 | 1-year daily price history (for charts) | Twelve Data | once a day |
 | Treasury yields, Fed funds, credit spreads, VIX, dollar, CPI, jobs, GDP | FRED | every 30 min (FRED itself updates daily or monthly) |
-| Futures positioning (COT): speculators' net long minus short, 21 markets, 10 years weekly | CFTC public reporting API (no key) | checked every 3 hours; new report each Friday |
-| UK Bank Rate, SONIA, gilt yields, sterling | Bank of England database (no key) | hourly |
-| Economic calendar, big-company earnings dates, market news | Finnhub (`FINNHUB_API_KEY` secret) | news every 30 min, calendars every 3 hours |
-| Headlines | Fed, ECB, MarketWatch, CNBC, BBC RSS feeds | every 30 min |
+| Futures positioning (COT): speculators' net long minus short, 21 markets, 10 years weekly | CFTC public reporting API (no key) | quick check every 10 min; new report each Friday |
+| UK Bank Rate, SONIA, gilt yields, sterling | Bank of England database (no key) | every 30 min |
+| This week's economic calendar (forecast, previous) | Forex Factory public feed (no key) | every 30 min |
+| Big-company earnings dates, market news | Finnhub (`FINNHUB_API_KEY` secret) | news every 10 min, earnings hourly |
+| Later US release dates | FRED | hourly |
+| Headlines | Fed, ECB, MarketWatch, CNBC, BBC RSS feeds | every 10 min |
 
 ## The API keys
 
@@ -30,13 +33,13 @@ They are never written into the code, the data files or the website. To change a
 
 ## Free-plan limits
 
-Twelve Data's free plan allows 800 calls a day and 8 a minute; each symbol is one call. The schedule uses about 530 a day. If you add symbols in `TD_SYMBOLS` (top of `scripts/refresh.py`), keep 32 × (number of symbols) + (number of symbols) under 800.
+Twelve Data's free plan allows 800 calls a day and 8 a minute; each symbol is one call. The schedule uses about 650 a day. If you add symbols in `TD_SYMBOLS` (top of `scripts/refresh.py`), slow their timer in `SCHEDULE` to stay under 800.
 
 ## Refresh by hand
 
-Actions tab → **Refresh market data** → **Run workflow**. A manual run (or a code change) fetches everything immediately.
+Actions tab → **Refresh market data** → **Run workflow**. A manual run fetches everything immediately (about 32 Twelve Data calls).
 
 ## Good to know
 
-- GitHub can start scheduled runs a few minutes late, and pauses schedules in a repository with no activity for 60 days. The data commits count as activity, so this shouldn't happen while it's working.
+- GitHub can start scheduled runs late or skip some when it's busy, and pauses schedules in a repository with no activity for 60 days. The data commits count as activity, so this shouldn't happen while it's working.
 - If a source fails, the page shows a yellow note at the top and keeps the last good numbers.
