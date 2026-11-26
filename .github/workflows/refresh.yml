@@ -45,15 +45,20 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/data
-          if git diff --cached --quiet; then
-            echo "No new data."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
+          changed=false
+          for i in 1 2 3; do
+            # Put the fresh data on top of the newest version of the repository,
+            # so runs that overlap with code changes never conflict.
+            rm -rf /tmp/newdata && cp -r docs/data /tmp/newdata
+            git fetch -q origin main && git reset -q --hard origin/main
+            rm -rf docs/data && cp -r /tmp/newdata docs/data
+            git add docs/data
+            if git diff --cached --quiet; then echo "No new data."; break; fi
             git commit -q -m "Refresh market data"
-            for i in 1 2 3; do git pull -q --rebase && git push -q && break; sleep 5; done
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
+            if git push -q origin HEAD:main; then changed=true; break; fi
+            sleep 5
+          done
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
       - name: Prepare website
         if: steps.save.outputs.changed == 'true' || github.event_name != 'schedule'
