@@ -475,7 +475,6 @@ KEY_RELEASES = {
     "Advance Monthly Sales for Retail and Food Services": "US retail sales",
     "Unemployment Insurance Weekly Claims Report": "US jobless claims",
     "Job Openings and Labor Turnover Survey": "US job openings (JOLTS)",
-    "FOMC Press Release": "Fed rate decision (FOMC)",
     "G.17 Industrial Production and Capacity Utilization": "US industrial production",
     "ISM Manufacturing": "ISM manufacturing",
     "Surveys of Consumers": "UMich consumer sentiment",

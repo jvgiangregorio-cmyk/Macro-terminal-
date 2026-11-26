@@ -506,7 +506,7 @@ function drawCalendar() {
     w.append(el("div", "sub-h", "US data releases (next 3 weeks)"));
     const t = el("table");
     C.releases.filter(r => r.date >= today).slice(0, 30).forEach(r => {
-      const row = el("tr", "cal-row" + (/CPI|jobs report|GDP|FOMC|PCE/.test(r.event) ? " hi" : ""));
+      const row = el("tr", "cal-row" + (/CPI|jobs report|GDP|PCE/.test(r.event) ? " hi" : ""));
       row.append(el("td", "nm", r.event), el("td", "num", dayLabel(r.date))); t.append(row);
     });
     w.append(t);
