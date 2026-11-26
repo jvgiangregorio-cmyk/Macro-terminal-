@@ -30,7 +30,7 @@ Twelve Data's free plan allows 800 calls a day and 8 a minute; each symbol is on
 
 ## Refresh by hand
 
-Actions tab → **Refresh market data** → **Run workflow**. A manual run fetches everything immediately.
+Actions tab → **Refresh market data** → **Run workflow**. A manual run (or a code change) fetches everything immediately.
 
 ## Good to know
 
