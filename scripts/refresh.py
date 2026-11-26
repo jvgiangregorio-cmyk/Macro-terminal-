@@ -7,6 +7,7 @@ from the repository's Secrets. The keys are never written to any file.
 Sources
   Twelve Data  stock ETFs, currencies, gold, silver, oil, bitcoin
   FRED         Treasury yields, Fed funds, spreads, VIX, dollar, economic data
+  CFTC         Commitments of Traders futures positioning (no key needed)
   RSS feeds    headlines (no key needed)
 
 Twelve Data's free plan allows 800 calls a day and 8 a minute, where each
@@ -87,6 +88,35 @@ FRED_SERIES = [
     ("ICSA", "Initial jobless claims", "Economy", "", "lin", 3),
     ("GDPC1", "Real GDP growth", "Economy", "% ann.", "pca", 8),
 ]
+
+# CFTC Commitments of Traders (legacy, futures only). Contract codes stay the same
+# even when the CFTC renames a market, so we match on the code.
+# (code, display name, group)
+COT_MARKETS = [
+    ("042601", "2-year T-note", "Rates"),
+    ("044601", "5-year T-note", "Rates"),
+    ("043602", "10-year T-note", "Rates"),
+    ("020601", "Treasury bond", "Rates"),
+    ("134741", "3-month SOFR", "Rates"),
+    ("13874A", "S&P 500 e-mini", "Equities"),
+    ("209742", "Nasdaq 100 e-mini", "Equities"),
+    ("124603", "Dow e-mini", "Equities"),
+    ("1170E1", "VIX", "Equities"),
+    ("098662", "US dollar index", "FX"),
+    ("099741", "Euro", "FX"),
+    ("097741", "Japanese yen", "FX"),
+    ("096742", "British pound", "FX"),
+    ("232741", "Australian dollar", "FX"),
+    ("090741", "Canadian dollar", "FX"),
+    ("088691", "Gold", "Commodities"),
+    ("084691", "Silver", "Commodities"),
+    ("067651", "WTI crude oil", "Commodities"),
+    ("085692", "Copper", "Commodities"),
+    ("023651", "Natural gas", "Commodities"),
+    ("133741", "Bitcoin", "Commodities"),
+]
+COT_YEARS = 10
+COT_URL = "https://publicreporting.cftc.gov/resource/6dca-aqww.json"
 
 NEWS_FEEDS = [
     ("Federal Reserve", "https://www.federalreserve.gov/feeds/press_all.xml"),
@@ -281,6 +311,59 @@ def fetch_fred(key):
         save("fred.json", {"updated": iso(now_utc()), "errors": errors, "series": series})
 
 
+# ---------------------------------------------------------------- CFTC COT
+
+
+def fetch_cot():
+    """Weekly positioning. Each point: [date, spec net, spec long, spec short, commercial net, open interest].
+
+    "Spec" is the CFTC's non-commercial group (mostly hedge funds and other
+    speculators). Net = long contracts minus short contracts.
+    """
+    print("CFTC Commitments of Traders")
+    start = now_utc().date().replace(year=now_utc().year - COT_YEARS)
+    codes = ",".join(f"'{c}'" for c, _, _ in COT_MARKETS)
+    q = {
+        "$select": "cftc_contract_market_code,report_date_as_yyyy_mm_dd,open_interest_all,"
+                   "noncomm_positions_long_all,noncomm_positions_short_all,"
+                   "comm_positions_long_all,comm_positions_short_all",
+        "$where": f"cftc_contract_market_code in({codes}) AND report_date_as_yyyy_mm_dd >= '{start}'",
+        "$order": "report_date_as_yyyy_mm_dd",
+        "$limit": "50000",
+    }
+    try:
+        rows = get_json(COT_URL + "?" + urllib.parse.urlencode(q))
+    except Exception as e:  # noqa: BLE001
+        print(f"  failed: {e}")
+        return
+    by_code = {}
+    for r in rows:
+        try:
+            nl, ns = int(r["noncomm_positions_long_all"]), int(r["noncomm_positions_short_all"])
+            cl, cs = int(r["comm_positions_long_all"]), int(r["comm_positions_short_all"])
+            oi = int(r["open_interest_all"])
+        except (KeyError, ValueError):
+            continue
+        by_code.setdefault(r["cftc_contract_market_code"], {})[r["report_date_as_yyyy_mm_dd"][:10]] = \
+            [nl - ns, nl, ns, cl - cs, oi]
+    markets = []
+    for code, name, group in COT_MARKETS:
+        pts = by_code.get(code)
+        if not pts:
+            print(f"  {name}: no data")
+            continue
+        markets.append({"code": code, "name": name, "group": group,
+                        "obs": [[d] + v for d, v in sorted(pts.items())]})
+    print(f"  {len(markets)} markets, {len(rows)} weekly rows")
+    if markets:
+        save("cot.json", {"updated": iso(now_utc()), "markets": markets})
+
+
+def cot_due(t):
+    """The report comes out weekly (usually Friday 15:30 US Eastern), so checking every 3 hours is plenty."""
+    return load("cot.json") is None or (t.hour % 3 == 0 and t.minute < 30)
+
+
 # ---------------------------------------------------------------- news
 
 
@@ -367,6 +450,9 @@ def main():
         print("FRED_API_KEY is not set: skipping FRED. Add it under Settings > Secrets.")
     else:
         fetch_fred(fred_key)
+
+    if force or cot_due(t):
+        fetch_cot()
 
     fetch_news()
 

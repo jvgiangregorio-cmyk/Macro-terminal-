@@ -95,6 +95,12 @@ svg text{fill:var(--muted);font:11px "IBM Plex Mono",monospace}
 .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
 details.tbl{margin-top:8px;font-size:12.5px;color:var(--muted)}
 details.tbl table{margin-top:6px;max-width:360px}
+/* COT */
+.cot-group td{font:600 11px "IBM Plex Mono",monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);padding-top:10px}
+.meter{display:inline-block;position:relative;width:64px;height:10px;vertical-align:middle}
+.meter::before{content:"";position:absolute;left:0;right:0;top:4px;height:2px;border-radius:2px;background:var(--line)}
+.meter i{position:absolute;top:1px;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:var(--text);border:2px solid var(--panel);box-sizing:content-box;top:-1px}
+.note{color:var(--faint);font-size:12px;margin:0 0 8px;line-height:1.5}
 /* economy */
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .tile{border:1px solid var(--line);border-radius:8px;padding:10px;cursor:pointer;background:transparent;text-align:left}
@@ -145,6 +151,12 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
       <div class="markets" id="markets"></div>
 
       <section class="panel">
+        <h2>Futures positioning (CFTC COT) <span id="cotAsOf"></span></h2>
+        <p class="note">Speculators' net position in futures: contracts betting on a rise minus contracts betting on a fall. Positive means they lean long. "vs 3Y" shows where today sits between the lowest (left) and highest (right) net position of the last three years. Click a row for 10 years of history.</p>
+        <table id="cot"></table>
+      </section>
+
+      <section class="panel">
         <h2>Economy <span>click a tile to chart it</span></h2>
         <div class="tiles" id="econ"></div>
       </section>
@@ -171,7 +183,7 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
   </div>
 
   <footer>
-    Prices: Twelve Data (refreshed about every 30 minutes on weekdays, may be delayed). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Headlines: publishers' RSS feeds.
+    Prices: Twelve Data (refreshed about every 30 minutes on weekdays, may be delayed). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Futures positioning: CFTC Commitments of Traders, legacy futures-only report (released Fridays for the prior Tuesday). Headlines: publishers' RSS feeds.
     This page reloads its data every 5 minutes. Not investment advice.
   </footer>
 </div>
@@ -186,7 +198,7 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 const SVGNS = "http://www.w3.org/2000/svg";
 const sv = (tag, attrs) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); return e; };
 
-let D = { prices: null, hist: null, fred: null, news: null };
+let D = { prices: null, hist: null, fred: null, news: null, cot: null };
 let selected = { kind: "td", id: "SPY" };
 let range = "1Y";
 let newsFilter = "All";
@@ -244,7 +256,22 @@ function valueAt(obs, daysBack) {
   for (let i = obs.length - 1; i >= 0; i--) if (obs[i][0] <= target) return obs[i];
   return null;
 }
+const fmtK = v => v == null ? "—" : (v > 0 ? "+" : v < 0 ? "−" : "") + (Math.abs(v) >= 1e6 ? fmt(Math.abs(v) / 1e6, 2) + "m" : Math.abs(v) >= 1e4 ? fmt(Math.abs(v) / 1e3, 0) + "k" : Math.abs(v) >= 1e3 ? fmt(Math.abs(v) / 1e3, 1) + "k" : fmt(Math.abs(v), 0));
+function cotMarket(code) { return (D.cot && D.cot.markets || []).find(m => m.code === code); }
+function cotStats(m) {
+  const o = m.obs, last = o.at(-1), prev = o.at(-2);
+  const win = o.slice(-156).map(p => p[1]), lo = Math.min(...win), hi = Math.max(...win);
+  return { date: last[0], net: last[1], chg: prev ? last[1] - prev[1] : null, pctOI: last[5] ? last[1] / last[5] * 100 : null,
+           pos: hi > lo ? (last[1] - lo) / (hi - lo) : 0.5, lo, hi };
+}
 function selectedSeries() {
+  if (selected.kind === "cot") {
+    const m = cotMarket(selected.id);
+    if (!m) return { title: selected.id, pts: [] };
+    const st = cotStats(m);
+    return { title: m.name + " · speculators' net position", sub: "CFTC COT · contracts · week of " + st.date, pts: m.obs.map(p => [p[0], p[1]]),
+             cot: true, last: st.net, chg: st.chg, chgText: st.chg == null ? "" : fmtK(st.chg) + " this week", zero: true };
+  }
   if (selected.kind === "td") {
     const q = (D.prices && D.prices.quotes || []).find(q => q.symbol === selected.id);
     const pts = (D.hist && D.hist.series[selected.id] || []).slice();
@@ -304,7 +331,7 @@ function drawMain() {
   const S = selectedSeries();
   $("mainTitle").replaceChildren(document.createTextNode(S.title + " "), el("span", "sym", S.sub || ""));
   $("mainTitle").querySelector(".sym").style.display = "inline";
-  $("mainVal").textContent = S.fred ? fmtFred(S.fred, S.last) : fmt(S.last, S.digits);
+  $("mainVal").textContent = S.cot ? fmtK(S.last) : S.fred ? fmtFred(S.fred, S.last) : fmt(S.last, S.digits);
   $("mainChg").replaceChildren(!S.chgText ? "" : S.chg == null ? el("span", "chg stale", S.chgText) : chgNode(S.chg, S.chgText));
   const box = $("mainChart"); box.replaceChildren();
   let pts = S.pts || [];
@@ -314,12 +341,13 @@ function drawMain() {
   }
   // table view
   const tb = el("table"); const hr = el("tr"); hr.append(el("th", "", "Date"), el("th", "", "Value")); tb.append(hr);
-  pts.slice(-25).reverse().forEach(p => { const r = el("tr"); r.append(el("td", "num", p[0]), el("td", "num", S.fred ? fmtFred(S.fred, p[1]) : fmt(p[1], S.digits))); tb.append(r); });
+  pts.slice(-25).reverse().forEach(p => { const r = el("tr"); r.append(el("td", "num", p[0]), el("td", "num", S.cot ? fmt(p[1], 0) : S.fred ? fmtFred(S.fred, p[1]) : fmt(p[1], S.digits))); tb.append(r); });
   $("mainTable").replaceChildren(tb);
   if (pts.length < 2) { box.append(el("div", "empty", "No history yet for this series. It appears after the first daily download.")); return; }
   lineChart(box, [{ name: S.title, pts, color: "var(--s1)" }], {
-    fmtY: v => S.fred ? fmtFred(S.fred, v) : fmt(v, S.digits),
-    xLabels: "date",
+    fmtY: v => S.cot ? fmt(v, 0) + " contracts" : S.fred ? fmtFred(S.fred, v) : fmt(v, S.digits),
+    fmtTick: S.cot ? fmtK : null,
+    xLabels: "date", zero: S.zero,
   });
 }
 
@@ -339,6 +367,7 @@ function lineChart(box, series, opt) {
     const tx = sv("text", { x: m.l + iw + 6, y: Y(t) + 4 }); tx.textContent = opt.fmtTick ? opt.fmtTick(t) : t.toLocaleString("en-US", { minimumFractionDigits: tickDigits(step), maximumFractionDigits: tickDigits(step) }); svg.append(tx);
   });
   svg.append(sv("line", { x1: m.l, x2: m.l + iw, y1: m.t + ih, y2: m.t + ih, class: "axis" }));
+  if (opt.zero && lo < 0 && hi > 0) svg.append(sv("line", { x1: m.l, x2: m.l + iw, y1: Y(0), y2: Y(0), stroke: "var(--faint)", "stroke-width": 1 }));
   // x labels
   if (opt.xLabels === "date") {
     const pts = series[0].pts, first = new Date(pts[0][0]), last = new Date(pts.at(-1)[0]);
@@ -445,6 +474,31 @@ function drawCurve() {
   lines.forEach(l => { const s = el("span"); const i = el("i"); i.style.background = l.color; s.append(i, document.createTextNode(l.name)); $("curveLegend").append(s); });
 }
 
+// ---------- COT table
+function drawCot() {
+  const t = $("cot"); t.replaceChildren();
+  const ms = D.cot && D.cot.markets || [];
+  if (!ms.length) { const r = el("tr"); const c = el("td", "empty", "Waiting for the first COT download."); r.append(c); t.append(r); $("cotAsOf").textContent = ""; return; }
+  const hr = el("tr"); ["", "Net", "Week", "% of OI", "vs 3Y", "3Y"].forEach(x => hr.append(el("th", "", x))); t.append(hr);
+  let group = "";
+  ms.forEach(m => {
+    if (m.group !== group) { group = m.group; const g = el("tr", "cot-group"); const c = el("td", "", group); c.colSpan = 6; g.append(c); t.append(g); }
+    const st = cotStats(m);
+    const r = el("tr", "row" + (selected.kind === "cot" && selected.id === m.code ? " sel" : "")); r.tabIndex = 0;
+    r.append(el("td", "nm", m.name), el("td", "num", fmtK(st.net)));
+    const c2 = el("td"); c2.append(chgNode(st.chg, fmtK(st.chg).replace("−", "-"))); r.append(c2);
+    r.append(el("td", "num", st.pctOI == null ? "—" : (st.pctOI > 0 ? "+" : "") + fmt(st.pctOI, 0) + "%"));
+    const c4 = el("td"); const mt = el("span", "meter"); const dot = el("i"); dot.style.left = (st.pos * 100).toFixed(0) + "%"; mt.append(dot);
+    mt.title = "3-year range: " + fmtK(st.lo) + " to " + fmtK(st.hi) + " (" + fmt(st.pos * 100, 0) + "% of the way up)"; mt.setAttribute("aria-label", mt.title); c4.append(mt); r.append(c4);
+    const c5 = el("td"); c5.append(spark(m.obs.slice(-156).map(p => [p[0], p[1]]))); r.append(c5);
+    const pick = () => { selected = { kind: "cot", id: m.code }; if (RANGES[range] < 1000) range = "5Y"; renderAll(); window.scrollTo({ top: 0, behavior: "smooth" }); };
+    r.onclick = pick; r.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
+    t.append(r);
+  });
+  const d = ms[0].obs.at(-1)[0];
+  $("cotAsOf").textContent = "positions as of " + new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+}
+
 // ---------- economy tiles
 const ECON = ["CPIAUCSL", "CPILFESL", "PCEPILFE", "UNRATE", "PAYEMS", "ICSA", "GDPC1"];
 function drawEcon() {
@@ -499,14 +553,14 @@ function drawHeader() {
 }
 
 function drawRanges() {
-  const keys = selected.kind === "fred" ? ["1M", "3M", "6M", "1Y", "2Y", "5Y", "Max"] : ["1M", "3M", "6M", "1Y", "Max"];
+  const keys = selected.kind === "fred" ? ["1M", "3M", "6M", "1Y", "2Y", "5Y", "Max"] : selected.kind === "cot" ? ["6M", "1Y", "2Y", "5Y", "Max"] : ["1M", "3M", "6M", "1Y", "Max"];
   if (!keys.includes(range)) range = "1Y";
   $("ranges").replaceChildren(...keys.map(k => { const b = el("button", "", k); b.type = "button"; b.setAttribute("aria-pressed", k === range); b.onclick = () => { range = k; drawRanges(); drawMain(); }; return b; }));
 }
 
 function renderAll() {
   hideTip();
-  drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawRates(); drawCurve(); drawEcon(); drawNews();
+  drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawCot(); drawRates(); drawCurve(); drawEcon(); drawNews();
 }
 
 // ---------- loading
@@ -515,8 +569,8 @@ async function getJSON(name) {
   catch (e) { return null; }
 }
 async function load() {
-  const [prices, hist, fred, news] = await Promise.all(["prices.json", "price_history.json", "fred.json", "news.json"].map(getJSON));
-  D = { prices: prices || D.prices, hist: hist || D.hist, fred: fred || D.fred, news: news || D.news };
+  const [prices, hist, fred, news, cot] = await Promise.all(["prices.json", "price_history.json", "fred.json", "news.json", "cot.json"].map(getJSON));
+  D = { prices: prices || D.prices, hist: hist || D.hist, fred: fred || D.fred, news: news || D.news, cot: cot || D.cot };
   renderAll();
 }
 let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderAll, 150); });
