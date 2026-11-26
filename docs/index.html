@@ -410,7 +410,7 @@ function drawMarkets() {
 }
 
 // ---------- rates table
-const RATE_ROWS = ["DFF", "SOFR", "DGS3MO", "DGS2", "DGS5", "DGS10", "DGS30", "T10Y2Y", "DFII10", "T10YIE", "MORTGAGE30US", "BAMLC0A0CM", "BAMLH0A0HYM2", "VIXCLS", "DTWEXBGS", "DCOILBRENTEU", "DHHNGSP"];
+const RATE_ROWS = ["DFF", "SOFR", "DGS3MO", "DGS2", "DGS5", "DGS10", "DGS30", "T10Y2Y", "DFII10", "T10YIE", "MORTGAGE30US", "BAMLC0A0CM", "BAMLH0A0HYM2", "VIXCLS", "DTWEXBGS", "DCOILWTICO", "DCOILBRENTEU", "DHHNGSP"];
 function drawRates() {
   const t = $("rates"); t.replaceChildren();
   const hr = el("tr"); ["", "Latest", "Chg", "1Y"].forEach(x => hr.append(el("th", "", x))); t.append(hr);

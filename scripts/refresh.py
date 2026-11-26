@@ -50,8 +50,8 @@ TD_SYMBOLS = [
     ("AUD/USD", "Australian dollar", "FX"),
     ("USD/CAD", "Canadian dollar", "FX"),
     ("XAU/USD", "Gold", "Commodities"),
-    ("XAG/USD", "Silver", "Commodities"),
-    ("WTI/USD", "WTI crude oil", "Commodities"),
+    ("SLV", "Silver (SLV ETF)", "Commodities"),   # XAG/USD is not on the free plan
+    ("USO", "Oil (USO ETF)", "Commodities"),      # WTI/USD is not on the free plan
     ("BTC/USD", "Bitcoin", "Commodities"),
 ]
 TD_BATCH = 8          # free plan: 8 calls per minute
@@ -76,6 +76,7 @@ FRED_SERIES = [
     ("BAMLH0A0HYM2", "High-yield credit spread", "Credit & risk", "%", "lin", 2),
     ("VIXCLS", "VIX", "Credit & risk", "", "lin", 2),
     ("DTWEXBGS", "Broad US dollar index", "Credit & risk", "", "lin", 2),
+    ("DCOILWTICO", "WTI crude", "Credit & risk", "$", "lin", 2),
     ("DCOILBRENTEU", "Brent crude", "Credit & risk", "$", "lin", 2),
     ("DHHNGSP", "Henry Hub natural gas", "Credit & risk", "$", "lin", 2),
     ("CPIAUCSL", "CPI inflation", "Economy", "% y/y", "pc1", 6),
