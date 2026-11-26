@@ -101,6 +101,10 @@ details.tbl table{margin-top:6px;max-width:360px}
 .meter::before{content:"";position:absolute;left:0;right:0;top:4px;height:2px;border-radius:2px;background:var(--line)}
 .meter i{position:absolute;top:1px;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:var(--text);border:2px solid var(--panel);box-sizing:content-box;top:-1px}
 .note{color:var(--faint);font-size:12px;margin:0 0 8px;line-height:1.5}
+.sub-h{font-size:12px;font-weight:600;color:var(--muted);margin:4px 0 4px}
+.sub-h:not(:first-child){margin-top:14px}
+.cal-row{border-bottom:1px solid var(--grid)}
+.cal-row.hi .nm{font-weight:600}
 /* economy */
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .tile{border:1px solid var(--line);border-radius:8px;padding:10px;cursor:pointer;background:transparent;text-align:left}
@@ -175,6 +179,16 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
       </section>
 
       <section class="panel">
+        <h2>UK rates &amp; sterling <span>Bank of England</span></h2>
+        <table id="ukrates"></table>
+      </section>
+
+      <section class="panel">
+        <h2>Coming up <span id="calAsOf"></span></h2>
+        <div id="calendar"></div>
+      </section>
+
+      <section class="panel">
         <h2>Headlines <span id="newsAsOf"></span></h2>
         <div class="chips" id="chips"></div>
         <ul class="news" id="news"></ul>
@@ -183,7 +197,7 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
   </div>
 
   <footer>
-    Prices: Twelve Data (refreshed about every 30 minutes on weekdays, may be delayed). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Futures positioning: CFTC Commitments of Traders, legacy futures-only report (released Fridays for the prior Tuesday). Headlines: publishers' RSS feeds.
+    Prices: Twelve Data (refreshed about every 30 minutes on weekdays, may be delayed). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Futures positioning: CFTC Commitments of Traders, legacy futures-only report (released Fridays for the prior Tuesday). UK rates and sterling: Bank of England. Calendars and some headlines: Finnhub. Other headlines: publishers' RSS feeds.
     This page reloads its data every 5 minutes. Not investment advice.
   </footer>
 </div>
@@ -198,7 +212,7 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 const SVGNS = "http://www.w3.org/2000/svg";
 const sv = (tag, attrs) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); return e; };
 
-let D = { prices: null, hist: null, fred: null, news: null, cot: null };
+let D = { prices: null, hist: null, fred: null, news: null, cot: null, boe: null, cal: null };
 let selected = { kind: "td", id: "SPY" };
 let range = "1Y";
 let newsFilter = "All";
@@ -227,7 +241,7 @@ function fmtFred(s, v) {
   if (s.unit === "k") return (v > 0 ? "+" : "") + fmt(v, 0) + "k";
   if (s.id === "ICSA") return fmt(v / 1000, 0) + "k";
   if (s.unit === "$") return "$" + fmt(v, 2);
-  if (s.unit === "") return fmt(v, s.id === "DTWEXBGS" ? 1 : 2);
+  if (s.unit === "") return fmt(v, s.id === "DTWEXBGS" ? 1 : /^XUDL(USS|ERS)$/.test(s.id) ? 4 : 2);
   return fmt(v, 2) + (s.unit === "pp" ? "" : "%");
 }
 const isPct = s => s.unit === "%" || s.unit === "pp";
@@ -248,7 +262,7 @@ function chgNode(v, text) {
 }
 
 // ---------- data access
-function fredSeries(id) { const s = D.fred && D.fred.series[id]; return s ? Object.assign({ id }, s) : null; }
+function fredSeries(id) { const s = (D.fred && D.fred.series[id]) || (D.boe && D.boe.series[id]); return s ? Object.assign({ id }, s) : null; }
 function valueAt(obs, daysBack) {
   if (!obs || !obs.length) return null;
   const last = new Date(obs[obs.length - 1][0]);
@@ -291,7 +305,7 @@ function selectedSeries() {
   let chgText = "";
   if (d != null) chgText = s.group === "Economy" ? "prior " + fmtFred(s, prev[1])
     : isPct(s) ? (d > 0 ? "+" : "") + fmt(d * 100, 0) + " bp" : (d > 0 ? "+" : "") + fmt(d, 2);
-  return { title: s.name, sub: "FRED " + s.id + (last ? " · " + last[0] : ""), pts: o, fred: s, last: last && last[1],
+  return { title: s.name, sub: (s.src || "FRED") + " " + s.id + (last ? " · " + last[0] : ""), pts: o, fred: s, last: last && last[1],
            chg: s.group === "Economy" ? null : d, chgText };
 }
 
@@ -440,24 +454,66 @@ function drawMarkets() {
 
 // ---------- rates table
 const RATE_ROWS = ["DFF", "SOFR", "DGS3MO", "DGS2", "DGS5", "DGS10", "DGS30", "T10Y2Y", "DFII10", "T10YIE", "MORTGAGE30US", "BAMLC0A0CM", "BAMLH0A0HYM2", "VIXCLS", "DTWEXBGS", "DCOILWTICO", "DCOILBRENTEU", "DHHNGSP"];
-function drawRates() {
-  const t = $("rates"); t.replaceChildren();
+function drawRates() { seriesTable("rates", RATE_ROWS, D.fred, "Waiting for the first FRED refresh."); }
+const UK_ROWS = ["IUDBEDR", "IUDSOIA", "IUDSNPY", "IUDMNPY", "IUDLNPY", "XUDLUSS", "XUDLERS", "XUDLBK67"];
+function drawUK() { seriesTable("ukrates", UK_ROWS, D.boe, "Waiting for the first Bank of England refresh."); }
+function seriesTable(tableId, ids, ready, emptyMsg) {
+  const t = $(tableId); t.replaceChildren();
   const hr = el("tr"); ["", "Latest", "Chg", "1Y"].forEach(x => hr.append(el("th", "", x))); t.append(hr);
-  if (!D.fred) { const r = el("tr"); const c = el("td", "empty", "Waiting for the first FRED refresh."); c.colSpan = 4; r.append(c); t.append(r); return; }
-  RATE_ROWS.forEach(id => {
+  if (!ready) { const r = el("tr"); const c = el("td", "empty", emptyMsg); c.colSpan = 4; r.append(c); t.append(r); return; }
+  ids.forEach(id => {
     const s = fredSeries(id); if (!s || !s.obs.length) return;
     const last = s.obs.at(-1), prev = s.obs.at(-2), d = prev ? last[1] - prev[1] : null;
     const r = el("tr", "row" + (selected.kind === "fred" && selected.id === id ? " sel" : "")); r.tabIndex = 0;
     const c0 = el("td"); c0.append(el("span", "nm", s.name), el("span", "sym", id + " · " + last[0].slice(5))); r.append(c0);
     r.append(el("td", "num", fmtFred(s, last[1])));
     const c2 = el("td");
-    c2.append(chgNode(d, d == null ? "" : isPct(s) ? (d > 0 ? "+" : "") + fmt(d * 100, 0) + " bp" : (d > 0 ? "+" : "") + fmt(d, 2)));
+    c2.append(chgNode(d, d == null ? "" : isPct(s) ? (d > 0 ? "+" : "") + fmt(d * 100, 0) + " bp" : (d > 0 ? "+" : "") + fmt(d, /^XUDL(USS|ERS)$/.test(id) ? 4 : 2)));
     r.append(c2);
     const c3 = el("td"); c3.append(spark(s.obs.filter(p => p[0] >= valueAt(s.obs, 365)?.[0]))); r.append(c3);
-    const pick = () => { selected = { kind: "fred", id }; renderAll(); };
+    const pick = () => { selected = { kind: "fred", id }; renderAll(); window.scrollTo({ top: 0, behavior: "smooth" }); };
     r.onclick = pick; r.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
     t.append(r);
   });
+}
+
+// ---------- calendar (Finnhub)
+const FLAGS = { US: "US", GB: "UK", EU: "EZ", DE: "DE", FR: "FR", JP: "JP", CN: "CN", CA: "CA", AU: "AU" };
+function drawCalendar() {
+  const w = $("calendar"); w.replaceChildren();
+  const C = D.cal;
+  if (!C) { w.append(el("div", "empty", "Waiting for the first Finnhub refresh. This needs the FINNHUB_API_KEY secret.")); $("calAsOf").textContent = ""; return; }
+  $("calAsOf").textContent = "updated " + relTime(C.updated);
+  const today = new Date().toISOString().slice(0, 10);
+  const dayLabel = d => new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  if (C.economic && C.economic.length) {
+    w.append(el("div", "sub-h", "Economic releases"));
+    const t = el("table"); const hr = el("tr"); ["", "", "Actual", "Fcst", "Prior"].forEach(x => hr.append(el("th", "", x))); t.append(hr);
+    let lastDay = "";
+    C.economic.filter(e => (e.time || "").slice(0, 10) >= today).slice(0, 40).forEach(e => {
+      const day = (e.time || "").slice(0, 10);
+      if (day !== lastDay) { lastDay = day; const g = el("tr", "cot-group"); const c = el("td", "", dayLabel(day)); c.colSpan = 5; g.append(c); t.append(g); }
+      const r = el("tr", "cal-row" + (e.impact === "high" ? " hi" : ""));
+      const when = e.time ? new Date(e.time.replace(" ", "T") + "Z").toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "";
+      const c0 = el("td"); c0.append(el("span", "nm", e.event || ""), el("span", "sym", (FLAGS[e.country] || e.country || "") + " · " + when + (e.impact === "high" ? " · high impact" : ""))); r.append(c0);
+      const u = e.unit && e.unit !== "%" ? "" : e.unit || "";
+      [e.actual, e.estimate, e.prev].forEach(v => r.append(el("td", "num", v == null ? "—" : String(v) + u)));
+      t.append(r);
+    });
+    w.append(t);
+  }
+  (C.notes || []).forEach(n => w.append(el("p", "note", n + ". Earnings dates and news still work.")));
+  w.append(el("div", "sub-h", "Big-company earnings"));
+  const ea = (C.earnings || []).filter(e => e.date >= today);
+  if (!ea.length) { w.append(el("div", "empty", "No watched companies report in the next 10 days.")); return; }
+  const t = el("table"); const hr = el("tr"); ["", "When", "EPS est."].forEach(x => hr.append(el("th", "", x))); t.append(hr);
+  ea.slice(0, 30).forEach(e => {
+    const r = el("tr", "cal-row");
+    r.append(el("td", "nm", e.symbol), el("td", "num", dayLabel(e.date) + (e.hour === "bmo" ? " · pre-open" : e.hour === "amc" ? " · after close" : "")),
+             el("td", "num", e.eps_est == null ? "—" : fmt(e.eps_est, 2)));
+    t.append(r);
+  });
+  w.append(t);
 }
 
 // ---------- yield curve
@@ -518,17 +574,18 @@ function drawEcon() {
 // ---------- news
 function drawNews() {
   const items = D.news && D.news.items || [];
-  const sources = ["All", ...new Set(items.map(i => i.source))];
+  const src = i => i.via || i.source;
+  const sources = ["All", ...new Set(items.map(src))];
   if (!sources.includes(newsFilter)) newsFilter = "All";
   $("chips").replaceChildren(...sources.map(s => { const b = el("button", "", s); b.type = "button"; b.setAttribute("aria-pressed", s === newsFilter); b.onclick = () => { newsFilter = s; drawNews(); }; return b; }));
   const ul = $("news"); ul.replaceChildren();
-  const shown = items.filter(i => newsFilter === "All" || i.source === newsFilter).slice(0, 50);
+  const shown = items.filter(i => newsFilter === "All" || src(i) === newsFilter).slice(0, 50);
   if (!shown.length) ul.append(el("li", "empty", "No headlines yet."));
   shown.forEach(i => {
     const li = el("li");
     if (/^https:\/\//.test(i.link)) { const a = el("a", "", i.title); a.href = i.link; a.target = "_blank"; a.rel = "noopener noreferrer"; li.append(a); }
     else li.append(el("span", "", i.title));
-    li.append(el("span", "meta", i.source + (i.published ? " · " + relTime(i.published) : "")));
+    li.append(el("span", "meta", (i.via ? i.via + " · " : "") + i.source + (i.published ? " · " + relTime(i.published) : "")));
     ul.append(li);
   });
   $("newsAsOf").textContent = D.news && D.news.updated ? "updated " + relTime(D.news.updated) : "";
@@ -540,7 +597,7 @@ function drawHeader() {
   const add = (label, iso) => { if (s.childNodes.length) s.append(document.createTextNode("  ·  ")); s.append(document.createTextNode(label + " "), el("b", "", iso ? localTime(iso) : "not yet")); };
   add("Prices", D.prices && D.prices.updated); add("Rates", D.fred && D.fred.updated); add("History", D.hist && D.hist.updated);
   const errs = [];
-  [["Twelve Data prices", D.prices], ["Twelve Data history", D.hist], ["FRED", D.fred]].forEach(([n, d]) => (d && d.errors || []).forEach(e => errs.push(n + ": " + e)));
+  [["Twelve Data prices", D.prices], ["Twelve Data history", D.hist], ["FRED", D.fred], ["Bank of England", D.boe]].forEach(([n, d]) => (d && d.errors || []).forEach(e => errs.push(n + ": " + e)));
   const bad = (D.prices && D.prices.quotes || []).filter(q => q.error).map(q => q.symbol);
   if (bad.length) errs.push("Some symbols could not be refreshed: " + bad.join(", "));
   const b = $("banner"); b.replaceChildren();
@@ -560,7 +617,7 @@ function drawRanges() {
 
 function renderAll() {
   hideTip();
-  drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawCot(); drawRates(); drawCurve(); drawEcon(); drawNews();
+  drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawCot(); drawRates(); drawUK(); drawCalendar(); drawCurve(); drawEcon(); drawNews();
 }
 
 // ---------- loading
@@ -569,8 +626,8 @@ async function getJSON(name) {
   catch (e) { return null; }
 }
 async function load() {
-  const [prices, hist, fred, news, cot] = await Promise.all(["prices.json", "price_history.json", "fred.json", "news.json", "cot.json"].map(getJSON));
-  D = { prices: prices || D.prices, hist: hist || D.hist, fred: fred || D.fred, news: news || D.news, cot: cot || D.cot };
+  const [prices, hist, fred, news, cot, boe, cal] = await Promise.all(["prices.json", "price_history.json", "fred.json", "news.json", "cot.json", "boe.json", "calendar.json"].map(getJSON));
+  D = { prices: prices || D.prices, hist: hist || D.hist, fred: fred || D.fred, news: news || D.news, cot: cot || D.cot, boe: boe || D.boe, cal: cal || D.cal };
   renderAll();
 }
 let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderAll, 150); });

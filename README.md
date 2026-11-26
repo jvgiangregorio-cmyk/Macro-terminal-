@@ -14,6 +14,8 @@ A personal markets dashboard (rates, FX, equities, commodities, economic data an
 | 1-year daily price history (for charts) | Twelve Data | once a day |
 | Treasury yields, Fed funds, credit spreads, VIX, dollar, CPI, jobs, GDP | FRED | every 30 min (FRED itself updates daily or monthly) |
 | Futures positioning (COT): speculators' net long minus short, 21 markets, 10 years weekly | CFTC public reporting API (no key) | checked every 3 hours; new report each Friday |
+| UK Bank Rate, SONIA, gilt yields, sterling | Bank of England database (no key) | hourly |
+| Economic calendar, big-company earnings dates, market news | Finnhub (`FINNHUB_API_KEY` secret) | news every 30 min, calendars every 3 hours |
 | Headlines | Fed, ECB, MarketWatch, CNBC, BBC RSS feeds | every 30 min |
 
 ## The API keys
@@ -22,6 +24,7 @@ The keys are stored as **repository secrets** (Settings → Secrets and variable
 
 - `TWELVEDATA_API_KEY`
 - `FRED_API_KEY`
+- `FINNHUB_API_KEY`
 
 They are never written into the code, the data files or the website. To change a key, open the secret and click **Update**.
 
