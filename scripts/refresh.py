@@ -7,6 +7,8 @@ from the repository's Secrets. The keys are never written to any file.
 Sources
   Twelve Data  stock ETFs, currencies, gold, silver, oil, bitcoin
   FRED         Treasury yields, Fed funds, spreads, VIX, dollar, economic data
+  Bank of England  UK Bank Rate, SONIA, gilt yields, sterling (no key needed)
+  Finnhub      economic calendar, earnings dates, market news
   CFTC         Commitments of Traders futures positioning (no key needed)
   RSS feeds    headlines (no key needed)
 
@@ -117,6 +119,33 @@ COT_MARKETS = [
 ]
 COT_YEARS = 10
 COT_URL = "https://publicreporting.cftc.gov/resource/6dca-aqww.json"
+
+# Bank of England statistical database (IADB). (code, display name, group, unit)
+BOE_SERIES = [
+    ("IUDBEDR", "Bank Rate", "UK", "%"),
+    ("IUDSOIA", "SONIA", "UK", "%"),
+    ("IUDSNPY", "5-year gilt", "UK", "%"),
+    ("IUDMNPY", "10-year gilt", "UK", "%"),
+    ("IUDLNPY", "20-year gilt", "UK", "%"),
+    ("XUDLUSS", "Sterling in dollars", "UK", ""),
+    ("XUDLERS", "Sterling in euros", "UK", ""),
+    ("XUDLBK67", "Sterling index (trade-weighted)", "UK", ""),
+]
+BOE_YEARS = 5
+BOE_URL = "https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp"
+# The Bank's site turns away requests that don't look like a browser.
+BROWSER_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+              "(KHTML, like Gecko) Chrome/130.0 Safari/537.36")
+
+# Finnhub (free key). Countries and companies to keep from the calendars.
+FINNHUB_URL = "https://finnhub.io/api/v1"
+CAL_COUNTRIES = {"US", "GB", "EU", "DE", "FR", "JP", "CN", "CA", "AU"}
+EARNINGS_WATCH = {
+    "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "AVGO", "BRK.B", "JPM", "V", "MA",
+    "UNH", "XOM", "LLY", "JNJ", "WMT", "PG", "HD", "COST", "ORCL", "NFLX", "CRM", "AMD", "ADBE",
+    "BAC", "WFC", "GS", "MS", "C", "KO", "PEP", "MCD", "NKE", "DIS", "INTC", "CSCO", "CVX", "CAT",
+    "BA", "IBM", "QCOM", "TXN", "MU", "PLTR", "UBER", "FDX", "TGT", "LOW", "SBUX",
+}
 
 NEWS_FEEDS = [
     ("Federal Reserve", "https://www.federalreserve.gov/feeds/press_all.xml"),
@@ -364,6 +393,118 @@ def cot_due(t):
     return load("cot.json") is None or (t.hour % 3 == 0 and t.minute < 30)
 
 
+# ---------------------------------------------------------------- Bank of England
+
+
+def fetch_boe():
+    print("Bank of England")
+    start = now_utc().date().replace(year=now_utc().year - BOE_YEARS)
+    q = {"csv.x": "yes", "Datefrom": start.strftime("%d/%b/%Y"), "Dateto": "now",
+         "SeriesCodes": ",".join(c for c, *_ in BOE_SERIES),
+         "CSVF": "TN", "UsingCodes": "Y", "VPD": "Y", "VFD": "N"}
+    try:
+        req = urllib.request.Request(BOE_URL + "?" + urllib.parse.urlencode(q),
+                                     headers={"User-Agent": BROWSER_UA, "Accept": "text/csv,*/*"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            text = r.read().decode("utf-8", "replace")
+        if text.lstrip().startswith("<"):
+            raise RuntimeError("the Bank returned a web page instead of data")
+    except Exception as e:  # noqa: BLE001
+        print(f"  failed: {e}")
+        old = load("boe.json")
+        if old is not None:
+            old["errors"] = [str(e)[:200]]
+            save("boe.json", old)
+        return
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    header = lines[0].split(",")
+    cols = {code: header.index(code) for code, *_ in BOE_SERIES if code in header}
+    obs = {code: [] for code in cols}
+    for line in lines[1:]:
+        parts = line.split(",")
+        try:
+            day = dt.datetime.strptime(parts[0], "%d %b %Y").date().isoformat()
+        except ValueError:
+            continue
+        for code, i in cols.items():
+            v = num(parts[i]) if i < len(parts) else None
+            if v is not None:
+                obs[code].append([day, round(v, 4)])
+    series = {code: {"name": name, "group": group, "unit": unit, "src": "Bank of England", "obs": obs[code]}
+              for code, name, group, unit in BOE_SERIES if obs.get(code)}
+    print(f"  {len(series)} series")
+    if series:
+        save("boe.json", {"updated": iso(now_utc()), "errors": [], "series": series})
+
+
+# ---------------------------------------------------------------- Finnhub
+
+
+def finnhub(path, key, **params):
+    req = urllib.request.Request(f"{FINNHUB_URL}/{path}?" + urllib.parse.urlencode(params),
+                                 headers={"User-Agent": UA, "X-Finnhub-Token": key})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def fetch_finnhub_news(key):
+    print("Finnhub news")
+    items = []
+    for cat in ("general", "forex"):
+        try:
+            for n in finnhub("news", key, category=cat)[:40]:
+                url, title = n.get("url") or "", (n.get("headline") or "").strip()
+                if title and url.startswith("https://"):
+                    when = iso(dt.datetime.fromtimestamp(n["datetime"], dt.timezone.utc)) if n.get("datetime") else None
+                    items.append({"source": n.get("source") or "Finnhub", "title": title, "link": url,
+                                  "published": when, "via": "Finnhub"})
+        except Exception as e:  # noqa: BLE001
+            print(f"  {cat} failed: {e}")
+    print(f"  {len(items)} headlines")
+    return items
+
+
+def fetch_calendar(key):
+    print("Finnhub calendars")
+    today = now_utc().date()
+    frm, to = today - dt.timedelta(days=3), today + dt.timedelta(days=10)
+    old = load("calendar.json") or {}
+    out = {"economic": old.get("economic", []), "earnings": old.get("earnings", []), "notes": []}
+    try:
+        rows = finnhub("calendar/economic", key, **{"from": frm.isoformat(), "to": to.isoformat()})
+        rows = rows.get("economicCalendar", []) if isinstance(rows, dict) else []
+        out["economic"] = sorted(
+            [{"time": r.get("time"), "country": r.get("country"), "event": r.get("event"),
+              "impact": r.get("impact"), "actual": r.get("actual"), "estimate": r.get("estimate"),
+              "prev": r.get("prev"), "unit": r.get("unit")}
+             for r in rows if r.get("country") in CAL_COUNTRIES and r.get("impact") in ("high", "medium")],
+            key=lambda r: r["time"] or "")
+        print(f"  economic: {len(out['economic'])} events")
+    except urllib.error.HTTPError as e:
+        msg = "not included in Finnhub's free plan" if e.code in (401, 403) else f"HTTP {e.code}"
+        print(f"  economic calendar: {msg}")
+        out["notes"].append(f"Economic calendar: {msg}")
+        out["economic"] = []
+    except Exception as e:  # noqa: BLE001
+        print(f"  economic calendar failed: {e}")
+        out["notes"].append(f"Economic calendar: {e}")
+    try:
+        rows = finnhub("calendar/earnings", key, **{"from": frm.isoformat(), "to": to.isoformat()})
+        rows = rows.get("earningsCalendar", []) if isinstance(rows, dict) else []
+        out["earnings"] = sorted(
+            [{"date": r.get("date"), "symbol": r.get("symbol"), "hour": r.get("hour"),
+              "eps_est": r.get("epsEstimate"), "eps": r.get("epsActual"),
+              "rev_est": r.get("revenueEstimate"), "rev": r.get("revenueActual"),
+              "quarter": r.get("quarter"), "year": r.get("year")}
+             for r in rows if r.get("symbol") in EARNINGS_WATCH],
+            key=lambda r: (r["date"] or "", r["symbol"]))
+        print(f"  earnings: {len(out['earnings'])} watched companies")
+    except Exception as e:  # noqa: BLE001
+        print(f"  earnings calendar failed: {e}")
+        out["notes"].append(f"Earnings calendar: {e}")
+    save("calendar.json", dict(out, updated=iso(now_utc()), window=[frm.isoformat(), to.isoformat()]))
+
+
 # ---------------------------------------------------------------- news
 
 
@@ -393,9 +534,9 @@ def parse_date(s):
     return iso(t.astimezone(dt.timezone.utc))
 
 
-def fetch_news():
+def fetch_news(extra=()):
     print("News")
-    items, errors = [], []
+    items, errors = list(extra), []
     atom = "{http://www.w3.org/2005/Atom}"
     for source, url in NEWS_FEEDS:
         try:
@@ -419,7 +560,13 @@ def fetch_news():
     if not items:
         return
     items.sort(key=lambda i: i["published"] or "", reverse=True)
-    save("news.json", {"updated": iso(now_utc()), "errors": errors, "items": items[:80]})
+    seen, unique = set(), []
+    for i in items:
+        k = i["title"].lower()[:80]
+        if k not in seen:
+            seen.add(k)
+            unique.append(i)
+    save("news.json", {"updated": iso(now_utc()), "errors": errors, "items": unique[:120]})
 
 
 # ---------------------------------------------------------------- main
@@ -454,7 +601,19 @@ def main():
     if force or cot_due(t):
         fetch_cot()
 
-    fetch_news()
+    if force or t.minute < 30 or load("boe.json") is None:  # hourly is plenty
+        fetch_boe()
+
+    fh_key = os.environ.get("FINNHUB_API_KEY", "").strip()
+    fh_news = []
+    if not fh_key:
+        print("FINNHUB_API_KEY is not set: skipping Finnhub. Add it under Settings > Secrets.")
+    else:
+        fh_news = fetch_finnhub_news(fh_key)
+        if force or cot_due(t) or load("calendar.json") is None:
+            fetch_calendar(fh_key)
+
+    fetch_news(fh_news)
 
 
 if __name__ == "__main__":
