@@ -12,10 +12,15 @@ Sources
   CFTC         Commitments of Traders futures positioning (no key needed)
   RSS feeds    headlines (no key needed)
 
+GitHub starts this every 10 minutes. Each source has its own timer (SCHEDULE
+below) so nobody's limits are hit, and docs/data/status.json records when each
+source was last checked and last had new data (the page shows both).
+
 Twelve Data's free plan allows 800 calls a day and 8 a minute, where each
-symbol counts as one call. This script asks for prices only on weekdays
-between 06:00 and 21:59 UTC (about 32 runs, 16 symbols each = ~512 calls),
-plus one daily history download (16 calls). That leaves headroom for manual runs.
+symbol counts as one call. Currencies, gold and bitcoin (8 symbols) refresh
+every 20 minutes on weekdays 06:00-21:59 UTC (~384 calls); the US-listed ETFs
+(8 symbols) every 15 minutes while US markets are open (~250 calls); plus one
+daily history download (16 calls). Total ~650, leaving room for manual runs.
 
 Run locally:  TWELVEDATA_API_KEY=... FRED_API_KEY=... python scripts/refresh.py
 Options:      --all   fetch everything now, ignoring the schedule rules
@@ -57,6 +62,19 @@ TD_SYMBOLS = [
     ("USO", "Oil (USO ETF)", "Commodities"),      # WTI/USD is not on the free plan
     ("BTC/USD", "Bitcoin", "Commodities"),
 ]
+# Minutes between checks for each source (the job itself runs every 10 minutes).
+SCHEDULE = {
+    "prices_fx": 20,      # Twelve Data, 8 symbols, weekdays 06-22 UTC
+    "prices_us": 15,      # Twelve Data, 8 symbols, US market hours only
+    "fred": 30,           # FRED data is daily or slower
+    "boe": 30,
+    "cot": 10,            # quick "is there a new report?" check
+    "finnhub_news": 10,
+    "news": 10,           # RSS feeds
+    "calendar": 60,       # earnings dates + US release dates
+    "forexfactory": 30,   # Forex Factory asks people not to poll it often
+}
+US_SESSION_UTC = (13 * 60 + 30, 21 * 60 + 15)   # minutes after midnight UTC (covers summer and winter time)
 TD_BATCH = 8          # free plan: 8 calls per minute
 TD_PAUSE = 62         # seconds to wait between batches
 PRICE_HOURS_UTC = range(6, 22)
@@ -156,6 +174,9 @@ NEWS_FEEDS = [
 ]
 NEWS_PER_SOURCE = 15
 
+FF_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+FF_CURRENCIES = {"USD", "GBP", "EUR", "JPY", "CNY", "CAD", "AUD", "CHF", "NZD"}
+
 # ---------------------------------------------------------------- helpers
 
 
@@ -193,10 +214,46 @@ def save(name, payload):
     strip = lambda d: {k: v for k, v in (d or {}).items() if k != "updated"}
     if old is not None and strip(old) == strip(payload):
         print(f"  {name}: unchanged")
-        return
+        return False
     DATA.mkdir(parents=True, exist_ok=True)
     (DATA / name).write_text(json.dumps(payload, separators=(",", ":"), ensure_ascii=False))
     print(f"  {name}: saved")
+    return True
+
+
+# ---------------------------------------------------------------- run status
+
+STATUS = {}
+
+
+def due(source, force=False):
+    """True if this source hasn't been checked for its SCHEDULE minutes (with 3 minutes' slack)."""
+    if force:
+        return True
+    last = STATUS.get(source, {}).get("checked")
+    if not last:
+        return True
+    age = now_utc() - dt.datetime.fromisoformat(last.replace("Z", "+00:00"))
+    return age >= dt.timedelta(minutes=SCHEDULE[source] - 3)
+
+
+def run_source(source, fn, *args):
+    """Run one fetch, record when it was checked and whether it brought new data."""
+    st = STATUS.setdefault(source, {})
+    st["checked"] = iso(now_utc())
+    try:
+        changed = fn(*args)
+        st["ok"] = True
+        st.pop("error", None)
+        if changed:
+            st["changed"] = st["checked"]
+    except Exception as e:  # noqa: BLE001
+        msg = str(e)[:200]
+        for k in (os.environ.get(v, "") for v in ("TWELVEDATA_API_KEY", "FRED_API_KEY", "FINNHUB_API_KEY")):
+            msg = hide_key(msg, k)
+        print(f"  {source} failed: {msg}")
+        st["ok"] = False
+        st["error"] = msg
 
 
 def num(x):
@@ -238,9 +295,9 @@ def td_call(endpoint, symbols, key, **params):
     return data
 
 
-def td_batches(endpoint, key, **params):
+def td_batches(endpoint, key, syms=None, **params):
     out, errors = {}, []
-    syms = [s for s, _, _ in TD_SYMBOLS]
+    syms = syms or [s for s, _, _ in TD_SYMBOLS]
     for i in range(0, len(syms), TD_BATCH):
         if i:
             time.sleep(TD_PAUSE)
@@ -256,12 +313,20 @@ def td_batches(endpoint, key, **params):
     return out, errors
 
 
-def fetch_prices(key):
-    print("Twelve Data prices")
-    raw, errors = td_batches("quote", key)
+US_SYMBOLS = [s for s, _, _ in TD_SYMBOLS if "/" not in s]      # US-listed ETFs
+FX_SYMBOLS = [s for s, _, _ in TD_SYMBOLS if "/" in s]          # trade around the clock
+
+
+def fetch_prices(key, syms):
+    print(f"Twelve Data prices: {', '.join(syms)}")
+    raw, errors = td_batches("quote", key, syms)
     old = {q["symbol"]: q for q in (load("prices.json") or {}).get("quotes", [])}
     quotes = []
     for sym, name, group in TD_SYMBOLS:
+        if sym not in syms:
+            if sym in old:
+                quotes.append(old[sym])
+            continue
         r = raw.get(sym) or {}
         if r.get("status") == "error" or num(r.get("close")) is None:
             msg = r.get("message") or "no data returned"
@@ -280,11 +345,9 @@ def fetch_prices(key):
             "as_of": r.get("datetime"),
             "ts": r.get("timestamp"),
         })
-    if not any("price" in q for q in quotes):
-        print("  no prices at all; keeping the old file")
-        if old:
-            return
-    save("prices.json", {"updated": iso(now_utc()), "errors": errors, "quotes": quotes})
+    if not any(raw.get(s) for s in syms):
+        raise RuntimeError("; ".join(errors) or "no prices returned")
+    return save("prices.json", {"updated": iso(now_utc()), "errors": errors, "quotes": quotes})
 
 
 def fetch_price_history(key):
@@ -300,16 +363,17 @@ def fetch_price_history(key):
             series[sym] = [p for p in pts if p[1] is not None]
         elif sym in old:
             series[sym] = old[sym]
-    if series:
-        save("price_history.json", {"updated": iso(now_utc()), "errors": errors, "series": series})
+    if not series:
+        raise RuntimeError("; ".join(errors) or "no history returned")
+    return save("price_history.json", {"updated": iso(now_utc()), "errors": errors, "series": series})
 
 
 def history_is_stale():
-    h = load("price_history.json")
-    if not h or not h.get("updated"):
+    """Daily closes: download once every 20 hours."""
+    last = STATUS.get("price_history", {}).get("checked") or (load("price_history.json") or {}).get("updated")
+    if not last:
         return True
-    last = dt.datetime.fromisoformat(h["updated"].replace("Z", "+00:00"))
-    return now_utc() - last > dt.timedelta(hours=20)
+    return now_utc() - dt.datetime.fromisoformat(last.replace("Z", "+00:00")) > dt.timedelta(hours=20)
 
 
 # ---------------------------------------------------------------- FRED
@@ -337,7 +401,8 @@ def fetch_fred(key):
                 series[sid] = old[sid]
         time.sleep(0.6)  # FRED allows 120 requests a minute; stay well below
     if series:
-        save("fred.json", {"updated": iso(now_utc()), "errors": errors, "series": series})
+        return save("fred.json", {"updated": iso(now_utc()), "errors": errors, "series": series})
+    raise RuntimeError("; ".join(errors[:3]) or "no data")
 
 
 # ---------------------------------------------------------------- CFTC COT
@@ -350,6 +415,15 @@ def fetch_cot():
     speculators). Net = long contracts minus short contracts.
     """
     print("CFTC Commitments of Traders")
+    have = load("cot.json")
+    if have and have.get("markets"):
+        latest = get_json(COT_URL + "?" + urllib.parse.urlencode({"$select": "max(report_date_as_yyyy_mm_dd) as d"}))
+        newest = (latest[0].get("d") or "")[:10] if latest else ""
+        mine = max(m["obs"][-1][0] for m in have["markets"])
+        if newest and newest <= mine:
+            print(f"  no new report (latest is {mine})")
+            return False
+        print(f"  new report for {newest}: downloading")
     start = now_utc().date().replace(year=now_utc().year - COT_YEARS)
     codes = ",".join(f"'{c}'" for c, _, _ in COT_MARKETS)
     q = {
@@ -360,11 +434,7 @@ def fetch_cot():
         "$order": "report_date_as_yyyy_mm_dd",
         "$limit": "50000",
     }
-    try:
-        rows = get_json(COT_URL + "?" + urllib.parse.urlencode(q))
-    except Exception as e:  # noqa: BLE001
-        print(f"  failed: {e}")
-        return
+    rows = get_json(COT_URL + "?" + urllib.parse.urlencode(q))
     by_code = {}
     for r in rows:
         try:
@@ -384,13 +454,9 @@ def fetch_cot():
         markets.append({"code": code, "name": name, "group": group,
                         "obs": [[d] + v for d, v in sorted(pts.items())]})
     print(f"  {len(markets)} markets, {len(rows)} weekly rows")
-    if markets:
-        save("cot.json", {"updated": iso(now_utc()), "markets": markets})
-
-
-def cot_due(t):
-    """The report comes out weekly (usually Friday 15:30 US Eastern), so checking every 3 hours is plenty."""
-    return load("cot.json") is None or (t.hour % 3 == 0 and t.minute < 30)
+    if not markets:
+        raise RuntimeError("no COT rows returned")
+    return save("cot.json", {"updated": iso(now_utc()), "markets": markets})
 
 
 # ---------------------------------------------------------------- Bank of England
@@ -410,12 +476,7 @@ def fetch_boe():
         if text.lstrip().startswith("<"):
             raise RuntimeError("the Bank returned a web page instead of data")
     except Exception as e:  # noqa: BLE001
-        print(f"  failed: {e}")
-        old = load("boe.json")
-        if old is not None:
-            old["errors"] = [str(e)[:200]]
-            save("boe.json", old)
-        return
+        raise RuntimeError(f"Bank of England: {e}") from e
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     header = lines[0].split(",")
     cols = {code: header.index(code) for code, *_ in BOE_SERIES if code in header}
@@ -433,8 +494,9 @@ def fetch_boe():
     series = {code: {"name": name, "group": group, "unit": unit, "src": "Bank of England", "obs": obs[code]}
               for code, name, group, unit in BOE_SERIES if obs.get(code)}
     print(f"  {len(series)} series")
-    if series:
-        save("boe.json", {"updated": iso(now_utc()), "errors": [], "series": series})
+    if not series:
+        raise RuntimeError("no Bank of England series in the reply")
+    return save("boe.json", {"updated": iso(now_utc()), "errors": [], "series": series})
 
 
 # ---------------------------------------------------------------- Finnhub
@@ -507,24 +569,8 @@ def fetch_calendar(key, fred_key=""):
     today = now_utc().date()
     frm, to = today - dt.timedelta(days=3), today + dt.timedelta(days=10)
     old = load("calendar.json") or {}
-    out = {"economic": old.get("economic", []), "earnings": old.get("earnings", []), "notes": []}
-    try:
-        rows = finnhub("calendar/economic", key, **{"from": frm.isoformat(), "to": to.isoformat()})
-        rows = rows.get("economicCalendar", []) if isinstance(rows, dict) else []
-        out["economic"] = sorted(
-            [{"time": r.get("time"), "country": r.get("country"), "event": r.get("event"),
-              "impact": r.get("impact"), "actual": r.get("actual"), "estimate": r.get("estimate"),
-              "prev": r.get("prev"), "unit": r.get("unit")}
-             for r in rows if r.get("country") in CAL_COUNTRIES and r.get("impact") in ("high", "medium")],
-            key=lambda r: r["time"] or "")
-        print(f"  economic: {len(out['economic'])} events")
-    except urllib.error.HTTPError as e:
-        msg = "not included in Finnhub's free plan" if e.code in (401, 403) else f"HTTP {e.code}"
-        print(f"  economic calendar: {msg}")
-        out["economic"] = []
-    except Exception as e:  # noqa: BLE001
-        print(f"  economic calendar failed: {e}")
-        out["notes"].append(f"Economic calendar: {e}")
+    # Finnhub's economic calendar is not in the free plan, so only earnings come from Finnhub.
+    out = {"earnings": old.get("earnings", []), "releases": old.get("releases", []), "notes": []}
     try:
         rows = finnhub("calendar/earnings", key, **{"from": frm.isoformat(), "to": to.isoformat()})
         rows = rows.get("earningsCalendar", []) if isinstance(rows, dict) else []
@@ -539,13 +585,32 @@ def fetch_calendar(key, fred_key=""):
     except Exception as e:  # noqa: BLE001
         print(f"  earnings calendar failed: {e}")
         out["notes"].append(f"Earnings calendar: {e}")
-    if not out["economic"] and fred_key:
+    if fred_key:
         try:
             out["releases"] = fetch_release_dates(fred_key)
             print(f"  US release dates from FRED: {len(out['releases'])}")
         except Exception as e:  # noqa: BLE001
             print(f"  FRED release dates failed: {hide_key(str(e), fred_key)}")
-    save("calendar.json", dict(out, updated=iso(now_utc()), window=[frm.isoformat(), to.isoformat()]))
+    return save("calendar.json", dict(out, updated=iso(now_utc()), window=[frm.isoformat(), to.isoformat()]))
+
+
+def fetch_forexfactory():
+    """This week's economic calendar from Forex Factory's public feed (forecast and previous; no actuals)."""
+    print("Forex Factory calendar")
+    rows = json.loads(get(FF_URL).decode("utf-8"))
+    events = []
+    for r in rows:
+        if r.get("country") not in FF_CURRENCIES or r.get("impact") not in ("High", "Medium", "Holiday"):
+            continue
+        when = parse_date(r.get("date"))
+        events.append({"time": when, "ccy": r.get("country"), "event": (r.get("title") or "").strip(),
+                       "impact": r.get("impact"), "forecast": r.get("forecast") or None,
+                       "previous": r.get("previous") or None, "actual": r.get("actual") or None})
+    events.sort(key=lambda e: e["time"] or "")
+    print(f"  {len(events)} medium/high-impact events")
+    if not events:
+        raise RuntimeError("empty calendar")
+    return save("ff.json", {"updated": iso(now_utc()), "events": events})
 
 
 # ---------------------------------------------------------------- news
@@ -601,7 +666,7 @@ def fetch_news(extra=()):
             print(f"  {source} failed: {e}")
             errors.append(f"{source}: {e}")
     if not items:
-        return
+        raise RuntimeError("no headlines from any source")
     items.sort(key=lambda i: i["published"] or "", reverse=True)
     seen, unique = set(), []
     for i in items:
@@ -609,54 +674,75 @@ def fetch_news(extra=()):
         if k not in seen:
             seen.add(k)
             unique.append(i)
-    save("news.json", {"updated": iso(now_utc()), "errors": errors, "items": unique[:120]})
+    return save("news.json", {"updated": iso(now_utc()), "errors": errors, "items": unique[:120]})
 
 
 # ---------------------------------------------------------------- main
 
 
 def main():
+    global STATUS
     force = "--all" in sys.argv
     t = now_utc()
+    STATUS = (load("status.json") or {}).get("sources", {})
     td_key = os.environ.get("TWELVEDATA_API_KEY", "").strip()
     fred_key = os.environ.get("FRED_API_KEY", "").strip()
+    fh_key = os.environ.get("FINNHUB_API_KEY", "").strip()
     weekday = t.weekday() < 5
+    mins = t.hour * 60 + t.minute
 
+    # --- Twelve Data (the only source with a tight daily limit)
     if not td_key:
         print("TWELVEDATA_API_KEY is not set: skipping prices. Add it under Settings > Secrets.")
     else:
-        did_prices = False
-        if force or (weekday and t.hour in PRICE_HOURS_UTC):
-            fetch_prices(td_key)
-            did_prices = True
-        else:
-            print("Outside price hours: skipping Twelve Data prices to save free-plan calls")
-        if force or (weekday and history_is_stale()) or load("price_history.json") is None:
-            if did_prices:
+        batches = 0
+        if (force or weekday and t.hour in PRICE_HOURS_UTC) and due("prices_fx", force):
+            run_source("prices_fx", fetch_prices, td_key, FX_SYMBOLS)
+            batches += 1
+        us_open = weekday and US_SESSION_UTC[0] <= mins <= US_SESSION_UTC[1]
+        if (force or us_open or load("prices.json") is None) and due("prices_us", force):
+            if batches:
                 time.sleep(TD_PAUSE)  # stay under 8 calls a minute
-            fetch_price_history(td_key)
+            run_source("prices_us", fetch_prices, td_key, US_SYMBOLS)
+            batches += 1
+        if force or (weekday and history_is_stale()) or load("price_history.json") is None:
+            if batches:
+                time.sleep(TD_PAUSE)
+            run_source("price_history", fetch_price_history, td_key)
 
-    if not fred_key:
+    # --- everything else is generous, so check more often
+    if fred_key and due("fred", force):
+        run_source("fred", fetch_fred, fred_key)
+    elif not fred_key:
         print("FRED_API_KEY is not set: skipping FRED. Add it under Settings > Secrets.")
-    else:
-        fetch_fred(fred_key)
+    if due("boe", force):
+        run_source("boe", fetch_boe)
+    if due("cot", force):
+        run_source("cot", fetch_cot)
+    if due("forexfactory", force):
+        run_source("forexfactory", fetch_forexfactory)
 
-    if force or cot_due(t):
-        fetch_cot()
-
-    if force or t.minute < 30 or load("boe.json") is None:  # hourly is plenty
-        fetch_boe()
-
-    fh_key = os.environ.get("FINNHUB_API_KEY", "").strip()
     fh_news = []
     if not fh_key:
         print("FINNHUB_API_KEY is not set: skipping Finnhub. Add it under Settings > Secrets.")
     else:
-        fh_news = fetch_finnhub_news(fh_key)
-        if force or cot_due(t) or load("calendar.json") is None:
-            fetch_calendar(fh_key, fred_key)
+        if due("finnhub_news", force):
+            def _fh():
+                fh_news.extend(fetch_finnhub_news(fh_key))
+                if not fh_news:
+                    raise RuntimeError("no Finnhub headlines")
+                return True
+            run_source("finnhub_news", _fh)
+        if due("calendar", force) or load("calendar.json") is None:
+            run_source("calendar", fetch_calendar, fh_key, fred_key)
+    if due("news", force) or fh_news:
+        if not fh_news:  # keep the Finnhub headlines we already have
+            fh_news = [i for i in (load("news.json") or {}).get("items", []) if i.get("via") == "Finnhub"]
+        run_source("news", fetch_news, fh_news)
 
-    fetch_news(fh_news)
+    DATA.mkdir(parents=True, exist_ok=True)
+    (DATA / "status.json").write_text(json.dumps({"run": iso(t), "sources": STATUS}, separators=(",", ":")))
+    print("status.json: saved")
 
 
 if __name__ == "__main__":

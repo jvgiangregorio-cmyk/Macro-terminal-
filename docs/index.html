@@ -105,6 +105,12 @@ details.tbl table{margin-top:6px;max-width:360px}
 .sub-h:not(:first-child){margin-top:14px}
 .cal-row{border-bottom:1px solid var(--grid)}
 .cal-row.hi .nm{font-weight:600}
+.upd{font-size:11.5px;color:var(--faint);margin:-4px 0 8px}
+.upd b{font-weight:500;color:var(--muted)}
+.upd.late b{color:var(--warn)}
+.cal-row.past{opacity:.5}
+.tag{display:inline-block;font:600 10px "IBM Plex Mono",monospace;padding:1px 5px;border-radius:4px;border:1px solid var(--line);color:var(--muted);margin-left:6px;vertical-align:1px}
+.tag.hi{border-color:var(--down);color:var(--down)}
 /* economy */
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .tile{border:1px solid var(--line);border-radius:8px;padding:10px;cursor:pointer;background:transparent;text-align:left}
@@ -148,6 +154,7 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
           <div class="chg" id="mainChg"></div>
           <div class="ranges" id="ranges" role="group" aria-label="Time range"></div>
         </div>
+        <div class="upd" id="mainUpd"></div>
         <div class="chart" id="mainChart" tabindex="0" aria-label="Price chart. Use left and right arrow keys to read values."></div>
         <details class="tbl"><summary>Show recent values as a table</summary><div id="mainTable"></div></details>
       </section>
@@ -156,12 +163,14 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
 
       <section class="panel">
         <h2>Futures positioning (CFTC COT) <span id="cotAsOf"></span></h2>
+        <div class="upd" data-src="cot"></div>
         <p class="note">Speculators' net position in futures: contracts betting on a rise minus contracts betting on a fall. Positive means they lean long. "vs 3Y" shows where today sits between the lowest (left) and highest (right) net position of the last three years. Click a row for 10 years of history.</p>
         <table id="cot"></table>
       </section>
 
       <section class="panel">
         <h2>Economy <span>click a tile to chart it</span></h2>
+        <div class="upd" data-src="fred"></div>
         <div class="tiles" id="econ"></div>
       </section>
     </div>
@@ -169,27 +178,32 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
     <div class="col">
       <section class="panel">
         <h2>US Treasury yield curve <span id="curveAsOf"></span></h2>
+        <div class="upd" data-src="fred"></div>
         <div class="chart" id="curveChart" style="height:210px" tabindex="0" aria-label="Yield curve chart"></div>
         <div class="legend" id="curveLegend"></div>
       </section>
 
       <section class="panel">
         <h2>Rates &amp; credit <span>daily change</span></h2>
+        <div class="upd" data-src="fred"></div>
         <table id="rates"></table>
       </section>
 
       <section class="panel">
         <h2>UK rates &amp; sterling <span>Bank of England</span></h2>
+        <div class="upd" data-src="boe"></div>
         <table id="ukrates"></table>
       </section>
 
       <section class="panel">
         <h2>Coming up <span id="calAsOf"></span></h2>
+        <div class="upd" data-src="forexfactory,calendar"></div>
         <div id="calendar"></div>
       </section>
 
       <section class="panel">
         <h2>Headlines <span id="newsAsOf"></span></h2>
+        <div class="upd" data-src="news,finnhub_news"></div>
         <div class="chips" id="chips"></div>
         <ul class="news" id="news"></ul>
       </section>
@@ -197,8 +211,8 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
   </div>
 
   <footer>
-    Prices: Twelve Data (refreshed about every 30 minutes on weekdays, may be delayed). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Futures positioning: CFTC Commitments of Traders, legacy futures-only report (released Fridays for the prior Tuesday). UK rates and sterling: Bank of England. Calendars and some headlines: Finnhub. Other headlines: publishers' RSS feeds.
-    This page reloads its data every 5 minutes. Not investment advice.
+    Prices: Twelve Data (currencies, gold and bitcoin every 20 minutes on weekdays; ETFs every 15 minutes in US market hours). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Futures positioning: CFTC Commitments of Traders, legacy futures-only report (released Fridays for the prior Tuesday). UK rates and sterling: Bank of England. Calendars and some headlines: Finnhub. Other headlines: publishers' RSS feeds.
+    The data refreshes on GitHub every 10 minutes (each source on its own timer, shown under each panel in UK time) and this page re-reads it every 2 minutes. Economic calendar: Forex Factory. Not investment advice.
   </footer>
 </div>
 
@@ -212,7 +226,7 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 const SVGNS = "http://www.w3.org/2000/svg";
 const sv = (tag, attrs) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); return e; };
 
-let D = { prices: null, hist: null, fred: null, news: null, cot: null, boe: null, cal: null };
+let D = { prices: null, hist: null, fred: null, news: null, cot: null, boe: null, cal: null, ff: null, status: null };
 let selected = { kind: "td", id: "SPY" };
 let range = "1Y";
 let newsFilter = "All";
@@ -253,6 +267,38 @@ function relTime(iso) {
   return Math.round(h / 24) + " days ago";
 }
 const localTime = iso => iso ? new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—";
+
+// ---------- "last updated" stamps, always in UK time
+const ukTime = iso => {
+  if (!iso) return "never";
+  const d = new Date(iso), now = new Date();
+  const day = d.toLocaleDateString("en-GB", { timeZone: "Europe/London", weekday: "short", day: "numeric", month: "short" });
+  const today = now.toLocaleDateString("en-GB", { timeZone: "Europe/London", weekday: "short", day: "numeric", month: "short" });
+  const t = d.toLocaleTimeString("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit" });
+  return day === today ? t : day + " " + t;
+};
+const SRC_LABEL = { prices_fx: "FX, gold & bitcoin", prices_us: "ETFs", fred: "FRED", boe: "Bank of England", cot: "CFTC",
+  news: "RSS feeds", finnhub_news: "Finnhub", calendar: "earnings & US dates", forexfactory: "Forex Factory", price_history: "price history" };
+const SRC_EVERY = { prices_fx: "every 20 min on weekdays", prices_us: "every 15 min in US market hours", fred: "every 30 min", boe: "every 30 min",
+  cot: "every 10 min (new report weekly)", news: "every 10 min", finnhub_news: "every 10 min", calendar: "hourly", forexfactory: "every 30 min", price_history: "daily" };
+function stampNode(srcs) {
+  const st = D.status && D.status.sources || {};
+  const box = el("div", "upd");
+  const parts = srcs.split(",").filter(k => st[k]);
+  if (!parts.length) { box.textContent = "Not checked yet"; return box; }
+  parts.forEach((k, i) => {
+    const s = st[k];
+    if (i) box.append(document.createTextNode("  ·  "));
+    if (parts.length > 1) box.append(document.createTextNode(SRC_LABEL[k] + ": "));
+    box.append(document.createTextNode("checked "), el("b", "", ukTime(s.checked)), document.createTextNode(", new data " + ukTime(s.changed)));
+    if (s.ok === false) { box.classList.add("late"); box.append(document.createTextNode(" (last check failed)")); }
+  });
+  box.title = parts.map(k => SRC_LABEL[k] + " is checked " + SRC_EVERY[k] + ". \"New data\" is when it last changed.").join(" ") + " Times are UK time.";
+  return box;
+}
+function drawStamps() {
+  document.querySelectorAll(".upd[data-src]").forEach(n => { const fresh = stampNode(n.dataset.src); n.replaceChildren(...fresh.childNodes); n.className = fresh.className; n.title = fresh.title; });
+}
 
 function chgNode(v, text) {
   const s = el("span", "chg num " + (v > 0 ? "up" : v < 0 ? "down" : ""));
@@ -347,6 +393,8 @@ function drawMain() {
   $("mainTitle").querySelector(".sym").style.display = "inline";
   $("mainVal").textContent = S.cot ? fmtK(S.last) : S.fred ? fmtFred(S.fred, S.last) : fmt(S.last, S.digits);
   $("mainChg").replaceChildren(!S.chgText ? "" : S.chg == null ? el("span", "chg stale", S.chgText) : chgNode(S.chg, S.chgText));
+  const src = selected.kind === "cot" ? "cot" : selected.kind === "fred" ? (D.boe && D.boe.series[selected.id] ? "boe" : "fred") : (selected.id.includes("/") ? "prices_fx" : "prices_us");
+  const su = stampNode(src); $("mainUpd").replaceChildren(...su.childNodes); $("mainUpd").className = su.className;
   const box = $("mainChart"); box.replaceChildren();
   let pts = S.pts || [];
   if (pts.length) {
@@ -431,7 +479,7 @@ function drawMarkets() {
   const wrap = $("markets"); wrap.replaceChildren();
   const quotes = D.prices && D.prices.quotes || [];
   ["Equities", "FX", "Commodities"].forEach(g => {
-    const p = el("section", "panel"); const h = el("h2", "", g === "Commodities" ? "Commodities & crypto" : g === "FX" ? "Currencies" : "Equities (ETFs)"); p.append(h);
+    const p = el("section", "panel"); const h = el("h2", "", g === "Commodities" ? "Commodities & crypto" : g === "FX" ? "Currencies" : "Equities (ETFs)"); p.append(h, stampNode(g === "Equities" ? "prices_us" : g === "FX" ? "prices_fx" : "prices_fx,prices_us"));
     const t = el("table"); const hr = el("tr"); ["", "Last", "Today", "1Y"].forEach(x => hr.append(el("th", "", x))); t.append(hr);
     const qs = quotes.filter(q => q.group === g);
     if (!qs.length) { p.append(el("div", "empty", "Waiting for the first price refresh.")); wrap.append(p); return; }
@@ -481,39 +529,47 @@ function seriesTable(tableId, ids, ready, emptyMsg) {
 const FLAGS = { US: "US", GB: "UK", EU: "EZ", DE: "DE", FR: "FR", JP: "JP", CN: "CN", CA: "CA", AU: "AU" };
 function drawCalendar() {
   const w = $("calendar"); w.replaceChildren();
-  const C = D.cal;
-  if (!C) { w.append(el("div", "empty", "Waiting for the first Finnhub refresh. This needs the FINNHUB_API_KEY secret.")); $("calAsOf").textContent = ""; return; }
-  $("calAsOf").textContent = "updated " + relTime(C.updated);
-  const today = new Date().toISOString().slice(0, 10);
+  const C = D.cal, F = D.ff;
+  if (!C && !F) { w.append(el("div", "empty", "Waiting for the first calendar refresh.")); return; }
+  const ukDay = iso => new Date(iso).toLocaleDateString("en-GB", { timeZone: "Europe/London", weekday: "short", day: "numeric", month: "short" });
+  const ukHM = iso => new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit" });
   const dayLabel = d => new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
-  if (C.economic && C.economic.length) {
-    w.append(el("div", "sub-h", "Economic releases"));
-    const t = el("table"); const hr = el("tr"); ["", "", "Actual", "Fcst", "Prior"].forEach(x => hr.append(el("th", "", x))); t.append(hr);
+  const today = new Date().toISOString().slice(0, 10);
+  let ffEnd = "";
+  if (F && F.events && F.events.length) {
+    w.append(el("div", "sub-h", "This week's economic events (Forex Factory, UK time)"));
+    const t = el("table"); const hr = el("tr"); ["", "Actual", "Fcst", "Prior"].forEach(x => hr.append(el("th", "", x))); t.append(hr);
     let lastDay = "";
-    C.economic.filter(e => (e.time || "").slice(0, 10) >= today).slice(0, 40).forEach(e => {
-      const day = (e.time || "").slice(0, 10);
-      if (day !== lastDay) { lastDay = day; const g = el("tr", "cot-group"); const c = el("td", "", dayLabel(day)); c.colSpan = 5; g.append(c); t.append(g); }
-      const r = el("tr", "cal-row" + (e.impact === "high" ? " hi" : ""));
-      const when = e.time ? new Date(e.time.replace(" ", "T") + "Z").toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "";
-      const c0 = el("td"); c0.append(el("span", "nm", e.event || ""), el("span", "sym", (FLAGS[e.country] || e.country || "") + " · " + when + (e.impact === "high" ? " · high impact" : ""))); r.append(c0);
-      const u = e.unit && e.unit !== "%" ? "" : e.unit || "";
-      [e.actual, e.estimate, e.prev].forEach(v => r.append(el("td", "num", v == null ? "—" : String(v) + u)));
+    const now = Date.now();
+    F.events.forEach(e => {
+      if (!e.time) return;
+      const day = ukDay(e.time);
+      if (day !== lastDay) { lastDay = day; const g = el("tr", "cot-group"); const c = el("td", "", day); c.colSpan = 4; g.append(c); t.append(g); }
+      const past = new Date(e.time) < now - 2 * 3600e3;
+      const r = el("tr", "cal-row" + (e.impact === "High" ? " hi" : "") + (past ? " past" : ""));
+      const c0 = el("td"); const nm = el("span", "nm", e.event);
+      if (e.impact === "High") nm.append(el("span", "tag hi", "HIGH")); else if (e.impact === "Holiday") nm.append(el("span", "tag", "HOLIDAY"));
+      c0.append(nm, el("span", "sym", e.ccy + " · " + (e.impact === "Holiday" ? "all day" : ukHM(e.time)))); r.append(c0);
+      [e.actual, e.forecast, e.previous].forEach(v => r.append(el("td", "num", v || "—")));
       t.append(r);
+      ffEnd = e.time.slice(0, 10) > ffEnd ? e.time.slice(0, 10) : ffEnd;
     });
     w.append(t);
+    w.append(el("p", "note", "Forex Factory's free feed gives forecasts and prior values but not the actual results, so Actual stays blank. Faded rows have already happened."));
   }
-  if ((!C.economic || !C.economic.length) && C.releases && C.releases.length) {
-    w.append(el("div", "sub-h", "US data releases (next 3 weeks)"));
+  const later = (C && C.releases || []).filter(r => r.date >= today && r.date > ffEnd);
+  if (later.length) {
+    w.append(el("div", "sub-h", ffEnd ? "Later US data releases (FRED)" : "US data releases (FRED)"));
     const t = el("table");
-    C.releases.filter(r => r.date >= today).slice(0, 30).forEach(r => {
+    later.slice(0, 20).forEach(r => {
       const row = el("tr", "cal-row" + (/CPI|jobs report|GDP|PCE/.test(r.event) ? " hi" : ""));
       row.append(el("td", "nm", r.event), el("td", "num", dayLabel(r.date))); t.append(row);
     });
     w.append(t);
   }
-  (C.notes || []).forEach(n => w.append(el("p", "note", n)));
+  (C && C.notes || []).forEach(n => w.append(el("p", "note", n)));
   w.append(el("div", "sub-h", "Big-company earnings"));
-  const ea = (C.earnings || []).filter(e => e.date >= today);
+  const ea = (C && C.earnings || []).filter(e => e.date >= today);
   if (!ea.length) { w.append(el("div", "empty", "No watched companies report in the next 10 days.")); return; }
   const t = el("table"); const hr = el("tr"); ["", "When", "EPS est."].forEach(x => hr.append(el("th", "", x))); t.append(hr);
   ea.slice(0, 30).forEach(e => {
@@ -597,14 +653,16 @@ function drawNews() {
     li.append(el("span", "meta", (i.via ? i.via + " · " : "") + i.source + (i.published ? " · " + relTime(i.published) : "")));
     ul.append(li);
   });
-  $("newsAsOf").textContent = D.news && D.news.updated ? "updated " + relTime(D.news.updated) : "";
+
 }
 
 // ---------- header + problems
 function drawHeader() {
   const s = $("stamps"); s.replaceChildren();
-  const add = (label, iso) => { if (s.childNodes.length) s.append(document.createTextNode("  ·  ")); s.append(document.createTextNode(label + " "), el("b", "", iso ? localTime(iso) : "not yet")); };
-  add("Prices", D.prices && D.prices.updated); add("Rates", D.fred && D.fred.updated); add("History", D.hist && D.hist.updated);
+  const run = D.status && D.status.run;
+  s.append(document.createTextNode("Last refresh run "), el("b", "", run ? ukTime(run) + " UK time" : "not yet"),
+           document.createTextNode(run ? " (" + relTime(run) + ")" : ""));
+  const stale = run && Date.now() - new Date(run) > 45 * 60000;
   const errs = [];
   [["Twelve Data prices", D.prices], ["Twelve Data history", D.hist], ["FRED", D.fred], ["Bank of England", D.boe]].forEach(([n, d]) => (d && d.errors || []).forEach(e => errs.push(n + ": " + e)));
   const bad = (D.prices && D.prices.quotes || []).filter(q => q.error).map(q => q.symbol);
@@ -613,6 +671,8 @@ function drawHeader() {
   if (!D.prices && !D.fred && !D.news) {
     const box = el("div", "banner", "No data yet. The first automatic refresh fills this page. You can start one now from the repository's Actions tab: Refresh market data, then Run workflow.");
     b.append(box);
+  } else if (stale) {
+    b.append(el("div", "banner", "The automatic refresh hasn't run for " + relTime(run).replace(" ago", "") + ". GitHub sometimes pauses scheduled jobs; check the repository's Actions tab."));
   } else if (errs.length) {
     const box = el("div", "banner"); box.append(el("strong", "", "Some data didn't refresh last time.")); const ul = el("ul"); errs.slice(0, 6).forEach(e => ul.append(el("li", "", e))); box.append(ul); b.append(box);
   }
@@ -626,7 +686,7 @@ function drawRanges() {
 
 function renderAll() {
   hideTip();
-  drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawCot(); drawRates(); drawUK(); drawCalendar(); drawCurve(); drawEcon(); drawNews();
+  drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawCot(); drawRates(); drawUK(); drawCalendar(); drawStamps(); drawCurve(); drawEcon(); drawNews();
 }
 
 // ---------- loading
@@ -635,13 +695,15 @@ async function getJSON(name) {
   catch (e) { return null; }
 }
 async function load() {
-  const [prices, hist, fred, news, cot, boe, cal] = await Promise.all(["prices.json", "price_history.json", "fred.json", "news.json", "cot.json", "boe.json", "calendar.json"].map(getJSON));
-  D = { prices: prices || D.prices, hist: hist || D.hist, fred: fred || D.fred, news: news || D.news, cot: cot || D.cot, boe: boe || D.boe, cal: cal || D.cal };
+  const names = ["prices", "price_history", "fred", "news", "cot", "boe", "calendar", "ff", "status"];
+  const got = await Promise.all(names.map(n => getJSON(n + ".json")));
+  const keys = ["prices", "hist", "fred", "news", "cot", "boe", "cal", "ff", "status"];
+  const next = {}; keys.forEach((k, i) => next[k] = got[i] || D[k]); D = next;
   renderAll();
 }
 let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderAll, 150); });
 load();
-setInterval(load, 5 * 60 * 1000);
+setInterval(load, 2 * 60 * 1000);
 })();
 </script>
 </body>

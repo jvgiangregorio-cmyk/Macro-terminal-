@@ -4,9 +4,9 @@ A personal markets dashboard (rates, FX, equities, commodities, economic data an
 
 ## How it works
 
-1. Every 30 minutes, GitHub runs `scripts/refresh.py` for free (the schedule is in `.github/workflows/refresh.yml`).
-2. The script downloads fresh numbers and saves them in `docs/data/`.
-3. GitHub publishes the `docs/` folder as a website, so the dashboard shows the latest data. The page also re-reads the data every 5 minutes while it's open.
+1. Every 10 minutes, GitHub runs `scripts/refresh.py` for free (the schedule is in `.github/workflows/refresh.yml`).
+2. Each data source has its own timer (`SCHEDULE` at the top of the script), so no service's limits are hit. The script saves the data in `docs/data/`, which is kept in GitHub's Actions cache between runs rather than in the repository history. The files committed in `docs/data/` are only a starting copy.
+3. GitHub publishes the `docs/` folder as a website. Under every panel the page shows, in UK time, when that source was last checked and when it last had new data. The page re-reads the data every 2 minutes while it's open.
 
 | Data | Source | How often |
 |---|---|---|

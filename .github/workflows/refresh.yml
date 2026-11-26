@@ -2,17 +2,16 @@ name: Refresh market data
 
 on:
   schedule:
-    # Every 30 minutes (UTC). GitHub may start runs a few minutes late.
-    # The script itself decides whether to ask Twelve Data for prices
-    # (weekdays 06:00-21:59 UTC only) to stay inside the free plan.
-    - cron: "15,45 * * * *"
+    # Every 10 minutes (UTC). GitHub sometimes starts runs a few minutes late.
+    # Each data source has its own timer inside scripts/refresh.py, so
+    # Twelve Data stays inside its free 800-calls-a-day limit.
+    - cron: "*/10 * * * *"
   workflow_dispatch:      # adds a "Run workflow" button on the Actions tab
   push:
     branches: [main]
-    paths-ignore: ["docs/data/**"]
 
 permissions:
-  contents: write   # to save the new data files
+  contents: read
   pages: write      # to publish the website
   id-token: write
 
@@ -34,49 +33,41 @@ jobs:
         with:
           python-version: "3.12"
 
+      # The data files live in GitHub's cache between runs rather than in the
+      # repository, so refreshing every 10 minutes doesn't bloat the history.
+      - name: Restore last data
+        uses: actions/cache/restore@v4
+        with:
+          path: docs/data
+          key: data-${{ github.run_id }}
+          restore-keys: data-
+
       - name: Fetch fresh data
         env:
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
-        run: python scripts/refresh.py ${{ github.event_name != 'schedule' && '--all' || '' }}
+        run: python scripts/refresh.py ${{ github.event_name == 'workflow_dispatch' && '--all' || '' }}
 
-      - name: Save data if it changed
-        id: save
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          changed=false
-          for i in 1 2 3; do
-            # Put the fresh data on top of the newest version of the repository,
-            # so runs that overlap with code changes never conflict.
-            rm -rf /tmp/newdata && cp -r docs/data /tmp/newdata
-            git fetch -q origin main && git reset -q --hard origin/main
-            rm -rf docs/data && cp -r /tmp/newdata docs/data
-            git add docs/data
-            if git diff --cached --quiet; then echo "No new data."; break; fi
-            git commit -q -m "Refresh market data"
-            if git push -q origin HEAD:main; then changed=true; break; fi
-            sleep 5
-          done
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+      - name: Keep data for next run
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: docs/data
+          key: data-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Prepare website
-        if: steps.save.outputs.changed == 'true' || github.event_name != 'schedule'
         uses: actions/configure-pages@v5
 
       - name: Upload website
-        if: steps.save.outputs.changed == 'true' || github.event_name != 'schedule'
         uses: actions/upload-pages-artifact@v4
         with:
           path: docs
 
       # GitHub's publishing service occasionally hiccups. Try twice, and if both
-      # fail, don't fail the whole run: the data is already saved and the next
-      # run (30 minutes later) publishes it.
+      # fail, don't fail the whole run: the next run (10 minutes later) publishes.
       - name: Publish website
         id: deploy
-        if: steps.save.outputs.changed == 'true' || github.event_name != 'schedule'
         continue-on-error: true
         uses: actions/deploy-pages@v4
 
@@ -92,4 +83,4 @@ jobs:
 
       - name: Note if publishing was skipped
         if: steps.deploy.outcome == 'failure' && steps.deploy2.outcome == 'failure'
-        run: echo "::warning::GitHub Pages didn't accept the update this time. The data is saved and the next run will publish it."
+        run: echo "::warning::GitHub Pages didn't accept the update this time. The next run will publish it."
