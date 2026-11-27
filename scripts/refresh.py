@@ -40,6 +40,7 @@ import datetime as dt
 import email.utils
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -189,11 +190,14 @@ RESEARCH_FEEDS = [
     ("Nordea", "https://www.nordea.com/en/data_export/articles_xml/275", None),
     ("WSJ Markets", "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain", None),
     ("WSJ Economy", "https://feeds.content.dowjones.io/public/rss/socialeconomyfeed", None),
-    ("Goldman Sachs podcast", "https://feeds.megaphone.fm/GLD9322922848", None),
     ("Fed Beige Book", "https://www.federalreserve.gov/feeds/press_all.xml", "beige book"),
-    ("FactSet Insight", "https://insight.factset.com/rss.xml", None),
+    ("CaixaBank Research", "https://www.caixabankresearch.com/en/rss.xml", None),   # daily markets report
+    ("Deutsche Bank Research", "https://www.dbresearch.com/PROD/IE-PROD/RSS_GROUP_HOME_EN.calias", None),
 ]
+# Leave out items whose link contains this (CaixaBank also publishes Spanish regional profiles).
+RESEARCH_SKIP_LINKS = {"CaixaBank Research": "autonomous-community"}
 RESEARCH_PER_SOURCE = 12
+RESEARCH_SUMMARY_CHARS = 700   # the publisher's own feed summary, shown in the pop-up
 RESEARCH_KEEP_DAYS = 120   # long enough to keep the last Beige Book (8 a year)
 
 FF_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
@@ -986,6 +990,14 @@ def text_of(el, *names):
     return ""
 
 
+def plain_text(html):
+    """Feed summaries often contain HTML: keep just the words."""
+    import html as htmllib
+    t = re.sub(r"<[^>]+>", " ", html or "")
+    t = re.sub(r"\s+", " ", htmllib.unescape(t)).strip()
+    return t if len(t) <= RESEARCH_SUMMARY_CHARS else t[:RESEARCH_SUMMARY_CHARS].rsplit(" ", 1)[0] + "…"
+
+
 def fetch_research():
     """Latest research headlines. Older items are kept (up to RESEARCH_KEEP_DAYS),
     so a source that publishes rarely, like the Beige Book, doesn't vanish."""
@@ -1004,12 +1016,16 @@ def fetch_research():
                 if must and must not in title.lower():
                     continue
                 link = text_of(e, "link", f"{atom}link")
+                if RESEARCH_SKIP_LINKS.get(source, "\0") in link:
+                    continue
                 if not link.startswith("https://"):   # podcasts often have no page per episode
                     link = channel_link
                 when = parse_date(text_of(e, "pubDate", f"{atom}updated", f"{atom}published",
                                           "{http://purl.org/dc/elements/1.1/}date"))
+                summary = plain_text(text_of(e, "description", f"{atom}summary", f"{atom}content"))
                 if title and link.startswith("https://"):
-                    fresh.append({"source": source, "title": title, "link": link, "published": when})
+                    fresh.append({"source": source, "title": title, "link": link, "published": when,
+                                  "summary": summary})
                     n += 1
                 if n >= RESEARCH_PER_SOURCE:
                     break

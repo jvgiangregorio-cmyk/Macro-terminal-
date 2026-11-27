@@ -214,6 +214,16 @@ tr.fund-detail > td{padding:8px 4px 14px;text-align:left;white-space:normal}
 .news a{color:var(--text);text-decoration:none}
 .news a:hover{text-decoration:underline}
 .news .meta{display:block;font-size:11.5px;color:var(--faint);margin-top:2px}
+.news .meta button{font-size:11px;padding:1px 8px;margin-left:8px;border-radius:999px}
+.rpt-back{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.rpt-back[hidden]{display:none}
+.rpt{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:10px;max-width:640px;width:100%;max-height:85vh;overflow:auto;padding:18px 20px;box-shadow:0 8px 30px rgba(0,0,0,.3)}
+.rpt h3{margin:0 0 6px;font-size:17px;line-height:1.35}
+.rpt .meta{font-size:12px;color:var(--faint)}
+.rpt .sum{font-size:14px;line-height:1.6;margin:14px 0}
+.rpt .note{font-size:12px;color:var(--faint);line-height:1.5;margin:0 0 14px}
+.rpt .acts{display:flex;gap:8px;justify-content:flex-end}
+.rpt .acts a{display:inline-block;padding:5px 12px;border-radius:6px;background:var(--accent);color:#fff;text-decoration:none;font-size:13px}
 .lib{margin-top:10px;border-top:1px solid var(--grid);padding-top:8px;font-size:13px}
 .lib summary{cursor:pointer;color:var(--muted)}
 .lib ul{list-style:none;margin:8px 0 0;padding:0;columns:2 220px;column-gap:18px}
@@ -355,7 +365,7 @@ table.corr td.dg{background:var(--grid)}
       </section>
 
       <section class="panel" data-cat="research">
-        <h2 data-help="research">Research <span>free public research · opens on the publisher's site</span></h2>
+        <h2 data-help="research">Research <span>free public research · times are UK time</span></h2>
         <div class="upd" data-src="research"></div>
         <div class="chips" id="rchips"></div>
         <ul class="news" id="research"></ul>
@@ -454,6 +464,12 @@ table.corr td.dg{background:var(--grid)}
 </div>
 
 <div class="tip" id="tip"></div>
+<div class="rpt-back" id="rptBack" hidden><div class="rpt" role="dialog" aria-modal="true" aria-labelledby="rptTitle">
+  <h3 id="rptTitle"></h3><div class="meta" id="rptMeta"></div>
+  <p class="sum" id="rptSum"></p>
+  <p class="note">This is the publisher's own summary from its feed. Banks don't allow their full reports to be shown inside other websites, so the full report opens on their site.</p>
+  <div class="acts"><button type="button" id="rptClose">Close</button><a id="rptLink" target="_blank" rel="noopener noreferrer">Open full report ↗</a></div>
+</div></div>
 
 <script>
 (() => {
@@ -495,7 +511,7 @@ const HELP = {
   "vs now": "How far the expected rate is from today's rate, in basis points (bp). 25 bp is one standard move. Positive means hikes are priced, negative means cuts.",
   "Cut / Hold / Hike": "The market's odds for this meeting's decision, in percent.",
   Odds: "The rough chance of a 25 bp move at this meeting, worked out from how much the expected rate changes at the meeting. 50% means half a move is priced.",
-  research: "Headlines from banks' and publishers' free public research: ING, Nordea, the Wall Street Journal, Goldman Sachs' podcast, FactSet and the Fed's Beige Book. Click a headline to read it on the publisher's own site; nothing is copied here. Checked every hour.",
+  research: "Headlines from banks' and publishers' free public research: ING, Nordea, CaixaBank, the Wall Street Journal and the Fed's Beige Book. 'Show report' opens the publisher's summary here; the headline itself opens the full report on the publisher's site. Checked every hour.",
   rchips: "Show one source at a time, or All for everything, newest first.",
   library: "Banks that publish free research on their websites but offer no feed we can read automatically. These are plain links to their research pages.",
   cal: "Economic data releases and big company results coming up, so you know what could move markets. Times are UK time.",
@@ -735,9 +751,7 @@ const LIBRARY = [
   ["DBS", "Group Research", "https://www.dbs.com.sg/sme/aics/our-approach.page"],
   ["Deutsche Bank", "Deutsche Bank Research (public part)", "https://www.dbresearch.com/"],
   ["DWS", "CIO View", "https://www.dws.com/en-dk/insights/cio-view/"],
-  ["FactSet", "Earnings Insight (John Butters)", "https://insight.factset.com/author/john-butters"],
   ["Fed", "Beige Book archive", "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm"],
-  ["Goldman Sachs", "Insights", "https://www.goldmansachs.com/insights"],
   ["HSBC Asset Management", "Investment insights", "https://www.assetmanagement.hsbc.co.uk/en/intermediary/investment-views/investment-insights"],
   ["Invesco", "Insights", "https://invesco.com/fi/en/insights.html"],
   ["JP Morgan", "Asset Management market updates and Guide to the Markets", "https://am.jpmorgan.com/us/en/asset-management/institutional/insights/market-insights/market-updates/"],
@@ -1313,10 +1327,31 @@ function drawResearch() {
     const li = el("li");
     if (/^https:\/\//.test(i.link)) { const a = el("a", "", i.title); a.href = i.link; a.target = "_blank"; a.rel = "noopener noreferrer"; li.append(a); }
     else li.append(el("span", "", i.title));
-    li.append(el("span", "meta", i.source + (i.published ? " · " + relTime(i.published) : "")));
+    const meta = el("span", "meta", i.source + (i.published ? " · " + ukDateTime(i.published) + " (" + relTime(i.published) + ")" : ""));
+    const sb = el("button", "", "Show report"); sb.type = "button"; sb.onclick = () => showReport(i);
+    meta.append(sb); li.append(meta);
     ul.append(li);
   });
 }
+// date and time in full, UK time, e.g. "Fri 27 Nov 2026, 14:05"
+const ukDateTime = iso => {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-GB", { timeZone: "Europe/London", weekday: "short", day: "numeric", month: "short", year: "numeric" }) + ", " +
+    d.toLocaleTimeString("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit" });
+};
+let rptFrom = null;
+function showReport(i) {
+  rptFrom = document.activeElement;
+  $("rptTitle").textContent = i.title;
+  $("rptMeta").textContent = i.source + (i.published ? " · " + ukDateTime(i.published) + " UK time" : "");
+  $("rptSum").textContent = i.summary || "This publisher's feed gives no summary for this report. Use the button below to read it on their site.";
+  const a = $("rptLink"); if (/^https:\/\//.test(i.link)) { a.href = i.link; a.hidden = false; } else a.hidden = true;
+  $("rptBack").hidden = false; $("rptClose").focus();
+}
+function closeReport() { $("rptBack").hidden = true; if (rptFrom && rptFrom.focus) rptFrom.focus(); }
+$("rptClose").onclick = closeReport;
+$("rptBack").addEventListener("click", e => { if (e.target === $("rptBack")) closeReport(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("rptBack").hidden) closeReport(); });
 function drawLibrary() {
   $("library").replaceChildren(...LIBRARY.map(([name, what, url]) => {
     const li = el("li"), a = el("a", "", name);
