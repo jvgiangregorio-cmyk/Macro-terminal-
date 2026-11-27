@@ -20,6 +20,7 @@ A personal markets dashboard (rates, FX, equities, commodities, economic data an
 | Big-company earnings dates, market news | Finnhub (`FINNHUB_API_KEY` secret) | news every 10 min, earnings hourly |
 | Later US release dates | FRED | hourly |
 | Headlines | Fed, ECB, MarketWatch, CNBC, BBC RSS feeds | every 10 min |
+| Research | Public research feeds: ING Think, Nordea, WSJ, Goldman Sachs podcast, Fed Beige Book, FactSet Insight, Syz (headlines and links only), plus a library of links to other banks' free research pages | hourly |
 
 ## The API keys
 
