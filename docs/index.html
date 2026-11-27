@@ -284,7 +284,8 @@ th .hq{margin-left:3px}
       <section class="panel" data-cat="positioning">
         <h2 data-help="cot">Futures positioning (CFTC COT) <span id="cotAsOf"></span></h2>
         <div class="upd" data-src="cot"></div>
-        <p class="note">Speculators' net position in futures: contracts betting on a rise minus contracts betting on a fall. Positive means they lean long. "vs 3Y" shows where today sits between the lowest (left) and highest (right) net position of the last three years. Click a row for 10 years of history.</p>
+        <div class="ov-group fx-toggle" id="cotToggle" role="group" aria-label="Which traders"></div>
+        <p class="note" id="cotNote"></p>
         <table id="cot"></table>
       </section>
 
@@ -385,7 +386,7 @@ th .hq{margin-left:3px}
   </div>
 
   <footer>
-    Prices: Twelve Data (currencies, gold and bitcoin every 20 minutes on weekdays; ETFs every 20 minutes in US market hours; the 21 currency crosses are worked out from the dollar pairs). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Futures positioning: CFTC Commitments of Traders, legacy futures-only report (released Fridays for the prior Tuesday). UK rates and sterling: Bank of England. Earnings dates: Finnhub. Research: publishers' RSS feeds, checked hourly (headlines and links only; the reports stay on the publishers' sites). Fundamentals: FRED, ONS, ECB, Statistics Bureau of Japan, SNB, Statistics Canada, RBA, OECD and BIS (checked every 6 hours).
+    Prices: Twelve Data (currencies, gold and bitcoin every 20 minutes on weekdays; ETFs every 20 minutes in US market hours; the 21 currency crosses are worked out from the dollar pairs). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Futures positioning: CFTC Commitments of Traders, futures-only Legacy (large speculators), Traders in Financial Futures (leveraged funds, asset managers) and Disaggregated (managed money) reports (positions as of Tuesday, released Friday). UK rates and sterling: Bank of England. Earnings dates: Finnhub. Research: publishers' RSS feeds, checked hourly (headlines and links only; the reports stay on the publishers' sites). Fundamentals: FRED, ONS, ECB, Statistics Bureau of Japan, SNB, Statistics Canada, RBA, OECD and BIS (checked every 6 hours).
     The data refreshes on GitHub every 10 minutes (each source on its own timer, shown under each panel in UK time) and this page re-reads it every 2 minutes. Economic calendar: Forex Factory. Not investment advice.
   </footer>
 </div>
@@ -412,7 +413,7 @@ const HELP = {
   FX: "Exchange rates. EUR/USD means how many US dollars one euro buys. Rising means the first currency is getting stronger. They update every 20 minutes on weekdays.",
   Commodities: "Gold, silver, oil and bitcoin. Silver and oil are shown through ETFs because their direct prices are not on the free data plan.",
   fxToggle: "Dollar pairs are the rates against the US dollar that are downloaded. Crosses are pairs without the dollar, like EUR/GBP, worked out by dividing two dollar pairs.",
-  cot: "Every week the US regulator (the CFTC) publishes how big speculators, mainly hedge funds, are positioned in futures. It shows whether the crowd is betting on prices going up or down.",
+  cot: "Every week the US regulator (the CFTC) publishes how different kinds of traders are positioned in futures. Websites differ because they pick different reports and trader groups: use the buttons to switch between large speculators (Legacy report), hedge funds (leveraged funds or managed money) and asset managers. All numbers are futures only, positions as of Tuesday.",
   econ: "Headline US economic figures from FRED (the St. Louis Fed's free database). Click a tile to see its history in the big chart.",
   curve: "The interest rate the US government pays to borrow for different lengths of time, from 3 months to 30 years. Normally longer loans pay more; when short rates are above long rates the curve is 'inverted', which has often come before recessions.",
   rates: "US interest rates, credit spreads and key market gauges from FRED. 'Chg' is the change from the day before.",
@@ -775,18 +776,41 @@ function valueAt(obs, daysBack) {
 }
 const fmtK = v => v == null ? "—" : (v > 0 ? "+" : v < 0 ? "−" : "") + (Math.abs(v) >= 1e6 ? fmt(Math.abs(v) / 1e6, 2) + "m" : Math.abs(v) >= 1e4 ? fmt(Math.abs(v) / 1e3, 0) + "k" : Math.abs(v) >= 1e3 ? fmt(Math.abs(v) / 1e3, 1) + "k" : fmt(Math.abs(v), 0));
 function cotMarket(code) { return (D.cot && D.cot.markets || []).find(m => m.code === code); }
+// Which trader group the COT panel shows. Each is a different CFTC report/category, so other
+// websites only match when they use the same one.
+const COT_VIEWS = {
+  spec: { col: 1, btn: "Large speculators", label: "large speculators",
+          note: "CFTC Legacy report, \"non-commercial\" traders: everyone big enough to report who is not hedging a business. This is the number most free sites (Investing.com, Barchart, MarketBeat) call \"CFTC speculative net positions\"." },
+  funds: { col: 6, btn: "Hedge funds", label: "hedge funds",
+           note: "Rates, stocks, currencies and bitcoin: \"leveraged funds\" from the CFTC Traders in Financial Futures (TFF) report. Commodities: \"managed money\" from the CFTC Disaggregated report. This is what most bank research and Bloomberg/Reuters stories quote. It can have the opposite sign to large speculators, because asset managers sit in the speculator group too." },
+  am: { col: 7, btn: "Asset managers", label: "asset managers",
+        note: "\"Asset manager/institutional\" from the CFTC Traders in Financial Futures (TFF) report: pension funds, insurers and mutual funds. Only exists for financial futures, so commodities are left blank." },
+};
+let cotView = "spec";
+try { const v = localStorage.getItem("mt-cot"); if (COT_VIEWS[v]) cotView = v; } catch (e) {}
+const cotCol = () => COT_VIEWS[cotView].col;
+function cotSeries(m, col) { col = col || cotCol(); return m.obs.filter(p => p[col] != null).map(p => [p[0], p[col]]); }
 function cotStats(m) {
-  const o = m.obs, last = o.at(-1), prev = o.at(-2);
-  const win = o.slice(-156).map(p => p[1]), lo = Math.min(...win), hi = Math.max(...win);
-  return { date: last[0], net: last[1], chg: prev ? last[1] - prev[1] : null, pctOI: last[5] ? last[1] / last[5] * 100 : null,
-           pos: hi > lo ? (last[1] - lo) / (hi - lo) : 0.5, lo, hi };
+  const col = cotCol(), o = m.obs.filter(p => p[col] != null);
+  if (!o.length) return null;
+  const last = o.at(-1), prev = o.at(-2);
+  const win = o.slice(-156).map(p => p[col]), lo = Math.min(...win), hi = Math.max(...win);
+  return { date: last[0], net: last[col], chg: prev ? last[col] - prev[col] : null, pctOI: last[5] ? last[col] / last[5] * 100 : null,
+           pos: hi > lo ? (last[col] - lo) / (hi - lo) : 0.5, lo, hi };
+}
+// The CFTC counts positions on Tuesday and normally publishes them on Friday (later in holiday weeks).
+function cotDates(d) {
+  const t = new Date(d + "T00:00:00Z"), f = new Date(t.getTime() + 3 * 864e5);
+  const o = { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" };
+  return { asOf: t.toLocaleDateString("en-GB", o), pub: f.toLocaleDateString("en-GB", o) };
 }
 function selectedSeries() {
   if (selected.kind === "cot") {
     const m = cotMarket(selected.id);
     if (!m) return { title: selected.id, pts: [] };
-    const st = cotStats(m);
-    return { title: m.name + " · speculators' net position", sub: "CFTC COT · contracts · week of " + st.date, pts: m.obs.map(p => [p[0], p[1]]),
+    const st = cotStats(m) || { date: "", net: null, chg: null };
+    const vw = cotView === "funds" ? m.funds || "leveraged funds" : COT_VIEWS[cotView].label;
+    return { title: m.name + " · " + vw + " net position", sub: "CFTC COT, futures only · contracts · positions as of " + st.date, pts: cotSeries(m),
              cot: true, last: st.net, chg: st.chg, chgText: st.chg == null ? "" : fmtK(st.chg) + " this week", zero: true };
   }
   if (selected.kind === "td") {
@@ -1135,24 +1159,31 @@ function drawCot() {
   const t = $("cot"); t.replaceChildren();
   const ms = D.cot && D.cot.markets || [];
   if (!ms.length) { const r = el("tr"); const c = el("td", "empty", "Waiting for the first COT download."); r.append(c); t.append(r); $("cotAsOf").textContent = ""; return; }
+  const tg = $("cotToggle"); tg.replaceChildren();
+  Object.entries(COT_VIEWS).forEach(([k, v]) => {
+    const b = el("button", "", v.btn); b.type = "button"; b.setAttribute("aria-pressed", cotView === k);
+    b.onclick = () => { cotView = k; try { localStorage.setItem("mt-cot", k); } catch (e) {} renderAll(); }; tg.append(b);
+  });
+  $("cotNote").textContent = "Net position = contracts betting on a rise minus contracts betting on a fall (futures only, options not included). Positive means they lean long. Currency futures are priced in dollars per unit of the foreign currency, so long yen means a bet on a stronger yen. \"vs 3Y\" shows where today sits between the lowest (left) and highest (right) of the last three years. Click a row for 10 years of history. Showing: " + COT_VIEWS[cotView].note;
   t.append(headRow(["", "Net", "Week", "% of OI", "vs 3Y", "3Y"]));
   let group = "";
   ms.forEach(m => {
     if (m.group !== group) { group = m.group; const g = el("tr", "cot-group"); const c = el("td", "", group); c.colSpan = 6; g.append(c); t.append(g); }
     const st = cotStats(m);
+    if (!st) { const r = el("tr", "row"); r.append(el("td", "nm", m.name), el("td", "num", "—")); const c = el("td", "empty", "not in this report"); c.colSpan = 4; r.append(c); t.append(r); return; }
     const r = el("tr", "row" + (selected.kind === "cot" && selected.id === m.code ? " sel" : "")); r.tabIndex = 0;
     const cn = el("td", "nm", m.name); cn.append(hq(HELP_COT[m.name], m.name)); r.append(cn, el("td", "num", fmtK(st.net)));
     const c2 = el("td"); c2.append(chgNode(st.chg, fmtK(st.chg).replace("−", "-"))); r.append(c2);
     r.append(el("td", "num", st.pctOI == null ? "—" : (st.pctOI > 0 ? "+" : "") + fmt(st.pctOI, 0) + "%"));
     const c4 = el("td"); const mt = el("span", "meter"); const dot = el("i"); dot.style.left = (st.pos * 100).toFixed(0) + "%"; mt.append(dot);
     mt.title = "3-year range: " + fmtK(st.lo) + " to " + fmtK(st.hi) + " (" + fmt(st.pos * 100, 0) + "% of the way up)"; mt.setAttribute("aria-label", mt.title); c4.append(mt); r.append(c4);
-    const c5 = el("td"); c5.append(spark(m.obs.slice(-156).map(p => [p[0], p[1]]))); r.append(c5);
+    const c5 = el("td"); c5.append(spark(cotSeries(m).slice(-156))); r.append(c5);
     const pick = () => { selected = { kind: "cot", id: m.code }; if (RANGES[range] < 1000) range = "5Y"; renderAll(); window.scrollTo({ top: 0, behavior: "smooth" }); };
     r.onclick = pick; r.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
     t.append(r);
   });
-  const d = ms[0].obs.at(-1)[0];
-  $("cotAsOf").textContent = "positions as of " + new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+  const cd = cotDates(ms.reduce((a, m) => m.obs.at(-1)[0] > a ? m.obs.at(-1)[0] : a, ""));
+  $("cotAsOf").textContent = COT_VIEWS[cotView].label + " · positions as of " + cd.asOf + ", published " + cd.pub;
 }
 
 // ---------- economy tiles
@@ -1315,8 +1346,10 @@ function ovCatalogue() {
       chg: i.unit === "%" ? "pp" : /change/i.test(i.name) ? "diff" : "pct", alias: CUR_ALIAS[i.cur] || "" };
   });
   (D.cot && D.cot.markets || []).forEach(m => {
-    cat["cot:" + m.code] = { name: m.name + " spec net", short: "COT " + m.name, group: "Futures positioning (COT)",
-      pts: () => m.obs.map(p => [p[0], p[1]]), fmt: v => fmt(v, 0), freq: "weekly", src: "cot" };
+    cat["cot:" + m.code] = { name: m.name + " large speculators net", short: "COT " + m.name, group: "Futures positioning (COT)",
+      pts: () => cotSeries(m, 1), fmt: v => fmt(v, 0), freq: "weekly", src: "cot" };
+    if (m.obs.some(p => p[6] != null)) cat["cotf:" + m.code] = { name: m.name + " hedge funds net (" + (m.funds || "leveraged funds") + ")", short: "COT funds " + m.name, group: "Futures positioning (COT)",
+      pts: () => cotSeries(m, 6), fmt: v => fmt(v, 0), freq: "weekly", src: "cot" };
   });
   return cat;
 }
@@ -1476,8 +1509,8 @@ function drawOverlay() {
     } else if (last != null && first) {
       const pct = (last / first - 1) * 100;
       const useDiff = s.key.startsWith("fred:") || s.key.startsWith("boe:") ? /%|pp/.test((cat[s.key] && (D.fred && D.fred.series[s.key.split(":")[1]] || D.boe && D.boe.series[s.key.split(":")[1]] || {}).unit) || "") : false;
-      const txt = useDiff ? ((last - first) * 100 > 0 ? "+" : "") + fmt((last - first) * 100, 0) + " bp" : s.key.startsWith("cot:") ? ((last - first) > 0 ? "+" : "") + fmt(last - first, 0) : (pct > 0 ? "+" : "") + fmt(pct, 2) + "%";
-      it.append(chgNode(useDiff ? last - first : s.key.startsWith("cot:") ? last - first : pct, txt));
+      const txt = useDiff ? ((last - first) * 100 > 0 ? "+" : "") + fmt((last - first) * 100, 0) + " bp" : s.key.startsWith("cot") ? ((last - first) > 0 ? "+" : "") + fmt(last - first, 0) : (pct > 0 ? "+" : "") + fmt(pct, 2) + "%";
+      it.append(chgNode(useDiff ? last - first : s.key.startsWith("cot") ? last - first : pct, txt));
     }
     if (s !== pri) {
       const a = [], b = [];

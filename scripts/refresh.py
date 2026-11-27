@@ -147,7 +147,10 @@ COT_MARKETS = [
     ("133741", "Bitcoin", "Commodities"),
 ]
 COT_YEARS = 10
-COT_URL = "https://publicreporting.cftc.gov/resource/6dca-aqww.json"
+COT_URL = "https://publicreporting.cftc.gov/resource/6dca-aqww.json"      # Legacy, futures only
+COT_TFF_URL = "https://publicreporting.cftc.gov/resource/gpe5-46if.json"  # Traders in Financial Futures, futures only
+COT_DIS_URL = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json"  # Disaggregated (commodities), futures only
+COT_COLS = 8  # length of each obs row; bump to force a full re-download after a format change
 
 # Bank of England statistical database (IADB). (code, display name, group, unit)
 BOE_SERIES = [
@@ -430,14 +433,19 @@ def fetch_fred(key):
 
 
 def fetch_cot():
-    """Weekly positioning. Each point: [date, spec net, spec long, spec short, commercial net, open interest].
+    """Weekly positioning, all futures-only, positions as of Tuesday (published Friday).
 
-    "Spec" is the CFTC's non-commercial group (mostly hedge funds and other
-    speculators). Net = long contracts minus short contracts.
+    Each obs row: [date, spec net, spec long, spec short, commercial net, open interest,
+                   funds net, asset managers net]
+      spec = Legacy report "non-commercial" (large speculators; what most free sites show)
+      funds = hedge funds: "leveraged funds" (TFF report) for rates/stocks/FX/bitcoin,
+              "managed money" (Disaggregated report) for commodities
+      asset managers = TFF "asset manager/institutional" (financial futures only, else None)
+    Net = long contracts minus short contracts.
     """
     print("CFTC Commitments of Traders")
     have = load("cot.json")
-    if have and have.get("markets"):
+    if have and have.get("markets") and all(len(m["obs"][-1]) >= COT_COLS for m in have["markets"]):
         latest = get_json(COT_URL + "?" + urllib.parse.urlencode({"$select": "max(report_date_as_yyyy_mm_dd) as d"}))
         newest = (latest[0].get("d") or "")[:10] if latest else ""
         mine = max(m["obs"][-1][0] for m in have["markets"])
@@ -447,25 +455,43 @@ def fetch_cot():
         print(f"  new report for {newest}: downloading")
     start = now_utc().date().replace(year=now_utc().year - COT_YEARS)
     codes = ",".join(f"'{c}'" for c, _, _ in COT_MARKETS)
-    q = {
-        "$select": "cftc_contract_market_code,report_date_as_yyyy_mm_dd,open_interest_all,"
-                   "noncomm_positions_long_all,noncomm_positions_short_all,"
-                   "comm_positions_long_all,comm_positions_short_all",
-        "$where": f"cftc_contract_market_code in({codes}) AND report_date_as_yyyy_mm_dd >= '{start}'",
-        "$order": "report_date_as_yyyy_mm_dd",
-        "$limit": "50000",
-    }
-    rows = get_json(COT_URL + "?" + urllib.parse.urlencode(q))
+
+    def pull(url, fields):
+        q = {
+            "$select": "cftc_contract_market_code,report_date_as_yyyy_mm_dd," + ",".join(fields),
+            "$where": f"cftc_contract_market_code in({codes}) AND report_date_as_yyyy_mm_dd >= '{start}'",
+            "$order": "report_date_as_yyyy_mm_dd",
+            "$limit": "50000",
+        }
+        out = {}
+        for r in get_json(url + "?" + urllib.parse.urlencode(q)):
+            try:
+                vals = [int(float(r[f])) for f in fields]
+            except (KeyError, ValueError):
+                continue
+            out[(r["cftc_contract_market_code"], r["report_date_as_yyyy_mm_dd"][:10])] = vals
+        return out
+
+    leg = pull(COT_URL, ["noncomm_positions_long_all", "noncomm_positions_short_all",
+                         "comm_positions_long_all", "comm_positions_short_all", "open_interest_all"])
+    try:
+        tff = pull(COT_TFF_URL, ["lev_money_positions_long", "lev_money_positions_short",
+                                 "asset_mgr_positions_long", "asset_mgr_positions_short"])
+    except Exception as e:  # keep the legacy numbers even if the extra report fails
+        print(f"  TFF report failed: {e}")
+        tff = {}
+    try:
+        dis = pull(COT_DIS_URL, ["m_money_positions_long_all", "m_money_positions_short_all"])
+    except Exception as e:
+        print(f"  Disaggregated report failed: {e}")
+        dis = {}
+
     by_code = {}
-    for r in rows:
-        try:
-            nl, ns = int(r["noncomm_positions_long_all"]), int(r["noncomm_positions_short_all"])
-            cl, cs = int(r["comm_positions_long_all"]), int(r["comm_positions_short_all"])
-            oi = int(r["open_interest_all"])
-        except (KeyError, ValueError):
-            continue
-        by_code.setdefault(r["cftc_contract_market_code"], {})[r["report_date_as_yyyy_mm_dd"][:10]] = \
-            [nl - ns, nl, ns, cl - cs, oi]
+    for (code, d), (nl, ns, cl, cs, oi) in leg.items():
+        t, m = tff.get((code, d)), dis.get((code, d))
+        funds = t[0] - t[1] if t else (m[0] - m[1] if m else None)
+        am = t[2] - t[3] if t else None
+        by_code.setdefault(code, {})[d] = [nl - ns, nl, ns, cl - cs, oi, funds, am]
     markets = []
     for code, name, group in COT_MARKETS:
         pts = by_code.get(code)
@@ -473,8 +499,9 @@ def fetch_cot():
             print(f"  {name}: no data")
             continue
         markets.append({"code": code, "name": name, "group": group,
+                        "funds": "leveraged funds" if any(k[0] == code for k in tff) else "managed money",
                         "obs": [[d] + v for d, v in sorted(pts.items())]})
-    print(f"  {len(markets)} markets, {len(rows)} weekly rows")
+    print(f"  {len(markets)} markets, {len(leg)} legacy / {len(tff)} TFF / {len(dis)} disaggregated rows")
     if not markets:
         raise RuntimeError("no COT rows returned")
     return save("cot.json", {"updated": iso(now_utc()), "markets": markets})
