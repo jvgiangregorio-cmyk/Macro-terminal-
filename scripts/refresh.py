@@ -366,13 +366,14 @@ def fetch_price_history(key):
 
 def history_is_stale():
     """Daily closes: download once every 20 hours, or straight away when a symbol is new."""
-    have = (load("price_history.json") or {}).get("series", {})
-    if any(sym not in have for sym, _, _ in TD_SYMBOLS):
-        return True
     last = STATUS.get("price_history", {}).get("checked") or (load("price_history.json") or {}).get("updated")
     if not last:
         return True
-    return now_utc() - dt.datetime.fromisoformat(last.replace("Z", "+00:00")) > dt.timedelta(hours=20)
+    age = now_utc() - dt.datetime.fromisoformat(last.replace("Z", "+00:00"))
+    have = (load("price_history.json") or {}).get("series", {})
+    missing = any(sym not in have for sym, _, _ in TD_SYMBOLS)
+    # a new symbol gets its history at once (but retried at most every 3 hours, to protect the daily limit)
+    return age > dt.timedelta(hours=20) or (missing and age > dt.timedelta(hours=3))
 
 
 # ---------------------------------------------------------------- FRED
