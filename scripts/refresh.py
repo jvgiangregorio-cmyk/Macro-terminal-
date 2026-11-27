@@ -8,10 +8,9 @@ Sources
   Twelve Data  stock ETFs, currencies, gold, silver, oil, bitcoin
   FRED         Treasury yields, Fed funds, spreads, VIX, dollar, economic data
   Bank of England  UK Bank Rate, SONIA, gilt yields, sterling (no key needed)
-  Finnhub      economic calendar, earnings dates, market news
+  Finnhub      earnings dates
   CFTC         Commitments of Traders futures positioning (no key needed)
-  RSS feeds    headlines (no key needed)
-  Research     public research and commentary feeds from banks (no key needed)
+  Forex Factory  this week's economic calendar (no key needed)
 
 GitHub starts this every 10 minutes. Each source has its own timer (SCHEDULE
 below) so nobody's limits are hit, and docs/data/status.json records when each
@@ -36,7 +35,6 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 DATA = Path(__file__).resolve().parent.parent / "docs" / "data"
@@ -70,9 +68,6 @@ SCHEDULE = {
     "fred": 30,           # FRED data is daily or slower
     "boe": 30,
     "cot": 10,            # quick "is there a new report?" check
-    "finnhub_news": 10,
-    "news": 10,           # RSS feeds
-    "research": 60,       # bank research feeds publish a few times a day at most
     "calendar": 60,       # earnings dates + US release dates
     "forexfactory": 30,   # Forex Factory asks people not to poll it often
 }
@@ -166,30 +161,6 @@ EARNINGS_WATCH = {
     "BAC", "WFC", "GS", "MS", "C", "KO", "PEP", "MCD", "NKE", "DIS", "INTC", "CSCO", "CVX", "CAT",
     "BA", "IBM", "QCOM", "TXN", "MU", "PLTR", "UBER", "FDX", "TGT", "LOW", "SBUX",
 }
-
-NEWS_FEEDS = [
-    ("Federal Reserve", "https://www.federalreserve.gov/feeds/press_all.xml"),
-    ("ECB", "https://www.ecb.europa.eu/rss/press.html"),
-    ("MarketWatch", "https://feeds.content.dowjones.io/public/rss/mw_topstories"),
-    ("CNBC Economy", "https://www.cnbc.com/id/20910258/device/rss/rss.html"),
-    ("BBC Business", "https://feeds.bbci.co.uk/news/business/rss.xml"),
-]
-NEWS_PER_SOURCE = 15
-
-# Free, public research feeds. We keep headlines and links only: the reports
-# stay on the publishers' sites (this page is public, so no copies of reports).
-# (name, feed URL, only keep items whose title contains this, lower case)
-RESEARCH_FEEDS = [
-    ("ING Think", "https://think.ing.com/rss/", None),
-    ("Nordea", "https://www.nordea.com/en/data_export/articles_xml/275", None),
-    ("WSJ Markets", "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain", None),
-    ("WSJ Economy", "https://feeds.content.dowjones.io/public/rss/socialeconomyfeed", None),
-    ("Goldman Sachs podcast", "https://feeds.megaphone.fm/GLD9322922848", None),
-    ("Fed Beige Book", "https://www.federalreserve.gov/feeds/press_all.xml", "beige book"),
-    ("FactSet Insight", "https://insight.factset.com/rss.xml", None),
-]
-RESEARCH_PER_SOURCE = 12
-RESEARCH_KEEP_DAYS = 120   # long enough to keep the last Beige Book (8 a year)
 
 FF_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 FF_CURRENCIES = {"USD", "GBP", "EUR", "JPY", "CNY", "CAD", "AUD", "CHF", "NZD"}
@@ -526,23 +497,6 @@ def finnhub(path, key, **params):
         return json.loads(r.read().decode("utf-8"))
 
 
-def fetch_finnhub_news(key):
-    print("Finnhub news")
-    items = []
-    for cat in ("general", "forex"):
-        try:
-            for n in finnhub("news", key, category=cat)[:40]:
-                url, title = n.get("url") or "", (n.get("headline") or "").strip()
-                if title and url.startswith("https://"):
-                    when = iso(dt.datetime.fromtimestamp(n["datetime"], dt.timezone.utc)) if n.get("datetime") else None
-                    items.append({"source": n.get("source") or "Finnhub", "title": title, "link": url,
-                                  "published": when, "via": "Finnhub"})
-        except Exception as e:  # noqa: BLE001
-            print(f"  {cat} failed: {e}")
-    print(f"  {len(items)} headlines")
-    return items
-
-
 # US data releases worth watching (FRED release names). Finnhub's free plan has no
 # economic calendar, so the release dates come from FRED instead.
 KEY_RELEASES = {
@@ -630,18 +584,7 @@ def fetch_forexfactory():
     return save("ff.json", {"updated": iso(now_utc()), "events": events})
 
 
-# ---------------------------------------------------------------- news
-
-
-def text_of(el, *names):
-    for n in names:
-        found = el.find(n)
-        if found is not None:
-            if found.text and found.text.strip():
-                return found.text.strip()
-            if found.get("href"):
-                return found.get("href")
-    return ""
+# ---------------------------------------------------------------- dates
 
 
 def parse_date(s):
@@ -657,93 +600,6 @@ def parse_date(s):
     if t.tzinfo is None:
         t = t.replace(tzinfo=dt.timezone.utc)
     return iso(t.astimezone(dt.timezone.utc))
-
-
-def fetch_news(extra=()):
-    print("News")
-    items, errors = list(extra), []
-    atom = "{http://www.w3.org/2005/Atom}"
-    for source, url in NEWS_FEEDS:
-        try:
-            root = ET.fromstring(get(url))
-            entries = root.findall(".//item") or root.findall(f".//{atom}entry")
-            n = 0
-            for e in entries:
-                title = text_of(e, "title", f"{atom}title")
-                link = text_of(e, "link", f"{atom}link")
-                when = parse_date(text_of(e, "pubDate", f"{atom}updated", f"{atom}published",
-                                          "{http://purl.org/dc/elements/1.1/}date"))
-                if title and link.startswith("https://"):
-                    items.append({"source": source, "title": title, "link": link, "published": when})
-                    n += 1
-                if n >= NEWS_PER_SOURCE:
-                    break
-            print(f"  {source}: {n} headlines")
-        except Exception as e:  # noqa: BLE001
-            print(f"  {source} failed: {e}")
-            errors.append(f"{source}: {e}")
-    if not items:
-        raise RuntimeError("no headlines from any source")
-    items.sort(key=lambda i: i["published"] or "", reverse=True)
-    seen, unique = set(), []
-    for i in items:
-        k = i["title"].lower()[:80]
-        if k not in seen:
-            seen.add(k)
-            unique.append(i)
-    return save("news.json", {"updated": iso(now_utc()), "errors": errors, "items": unique[:120]})
-
-
-def fetch_research():
-    """Latest research headlines. Older items are kept (up to RESEARCH_KEEP_DAYS),
-    so a source that publishes rarely, like the Beige Book, doesn't vanish."""
-    print("Research")
-    atom = "{http://www.w3.org/2005/Atom}"
-    old = (load("research.json") or {}).get("items", [])
-    fresh, errors, ok_sources = [], [], set()
-    for source, url, must in RESEARCH_FEEDS:
-        try:
-            root = ET.fromstring(get(url))
-            channel_link = text_of(root.find("channel") if root.find("channel") is not None else root, "link", f"{atom}link")
-            entries = root.findall(".//item") or root.findall(f".//{atom}entry")
-            n = 0
-            for e in entries:
-                title = text_of(e, "title", f"{atom}title")
-                if must and must not in title.lower():
-                    continue
-                link = text_of(e, "link", f"{atom}link")
-                if not link.startswith("https://"):   # podcasts often have no page per episode
-                    link = channel_link
-                when = parse_date(text_of(e, "pubDate", f"{atom}updated", f"{atom}published",
-                                          "{http://purl.org/dc/elements/1.1/}date"))
-                if title and link.startswith("https://"):
-                    fresh.append({"source": source, "title": title, "link": link, "published": when})
-                    n += 1
-                if n >= RESEARCH_PER_SOURCE:
-                    break
-            ok_sources.add(source)
-            print(f"  {source}: {n} items")
-        except Exception as e:  # noqa: BLE001
-            print(f"  {source} failed: {e}")
-            errors.append(f"{source}: {str(e)[:120]}")
-    if not ok_sources:
-        raise RuntimeError("no research feed could be read")
-    cutoff = iso(now_utc() - dt.timedelta(days=RESEARCH_KEEP_DAYS))
-    names = {name for name, _, _ in RESEARCH_FEEDS}
-    items, seen = [], set()
-    for i in fresh + old:   # fresh first, so updated titles win
-        key = (i["source"], i["link"], i["title"].lower()[:80])
-        if i["source"] not in names or key in seen or (i.get("published") or "9") < cutoff:
-            continue
-        seen.add(key)
-        items.append(i)
-    items.sort(key=lambda i: i["published"] or "", reverse=True)
-    per, kept = {}, []
-    for i in items:
-        per[i["source"]] = per.get(i["source"], 0) + 1
-        if per[i["source"]] <= RESEARCH_PER_SOURCE or i["source"] == "Fed Beige Book":
-            kept.append(i)
-    return save("research.json", {"updated": iso(now_utc()), "errors": errors, "items": kept})
 
 
 # ---------------------------------------------------------------- main
@@ -791,25 +647,15 @@ def main():
     if due("forexfactory", force):
         run_source("forexfactory", fetch_forexfactory)
 
-    fh_news = []
     if not fh_key:
-        print("FINNHUB_API_KEY is not set: skipping Finnhub. Add it under Settings > Secrets.")
-    else:
-        if due("finnhub_news", force):
-            def _fh():
-                fh_news.extend(fetch_finnhub_news(fh_key))
-                if not fh_news:
-                    raise RuntimeError("no Finnhub headlines")
-                return True
-            run_source("finnhub_news", _fh)
-        if due("calendar", force) or load("calendar.json") is None:
-            run_source("calendar", fetch_calendar, fh_key, fred_key)
-    if due("news", force) or fh_news:
-        if not fh_news:  # keep the Finnhub headlines we already have
-            fh_news = [i for i in (load("news.json") or {}).get("items", []) if i.get("via") == "Finnhub"]
-        run_source("news", fetch_news, fh_news)
-    if due("research", force) or load("research.json") is None:
-        run_source("research", fetch_research)
+        print("FINNHUB_API_KEY is not set: skipping earnings dates. Add it under Settings > Secrets.")
+    elif due("calendar", force) or load("calendar.json") is None:
+        run_source("calendar", fetch_calendar, fh_key, fred_key)
+
+    # Sources that were removed from the terminal: drop their old files and status.
+    for gone in ("news", "finnhub_news", "research"):
+        STATUS.pop(gone, None)
+        (DATA / f"{gone}.json").unlink(missing_ok=True)
 
     DATA.mkdir(parents=True, exist_ok=True)
     (DATA / "status.json").write_text(json.dumps({"run": iso(t), "sources": STATUS}, separators=(",", ":")))

@@ -111,16 +111,6 @@ details.tbl table{margin-top:6px;max-width:360px}
 .cal-row.past{opacity:.5}
 .tag{display:inline-block;font:600 10px "IBM Plex Mono",monospace;padding:1px 5px;border-radius:4px;border:1px solid var(--line);color:var(--muted);margin-left:6px;vertical-align:1px}
 .tag.hi{border-color:var(--down);color:var(--down)}
-/* TradingView widgets */
-.tape{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:14px;min-height:46px;overflow:hidden}
-.tv-chart{height:560px}
-.tv-yields{height:600px}
-.tv-chart .tradingview-widget-container,.tv-yields .tradingview-widget-container{height:100%;width:100%}
-.tv-chart .tradingview-widget-container__widget,.tv-yields .tradingview-widget-container__widget{height:calc(100% - 32px);width:100%}
-.tradingview-widget-copyright{font-size:11px;color:var(--faint);line-height:32px}
-.tradingview-widget-copyright a{color:var(--faint)}
-.tape .tradingview-widget-copyright{display:none}
-@media (max-width:520px){.tv-chart{height:420px}}
 /* economy */
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .tile{border:1px solid var(--line);border-radius:8px;padding:10px;cursor:pointer;background:transparent;text-align:left}
@@ -129,24 +119,7 @@ details.tbl table{margin-top:6px;max-width:360px}
 .tile .t{font-size:12px;color:var(--muted)}
 .tile .v{font:500 20px "IBM Plex Mono",monospace;margin:2px 0}
 .tile .p{font-size:11.5px;color:var(--faint)}
-/* news */
-.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
-.chips button{font-size:12px;padding:2px 9px;border-radius:999px}
-.news{list-style:none;margin:0;padding:0;max-height:620px;overflow:auto}
-.news li{padding:8px 0;border-bottom:1px solid var(--grid)}
-.news li:last-child{border-bottom:0}
-.news a{color:var(--text);text-decoration:none}
-.news a:hover{text-decoration:underline}
-.news .meta{display:block;font-size:11.5px;color:var(--faint);margin-top:2px}
 .empty{color:var(--faint);font-size:13px;padding:8px 0}
-/* research library */
-.lib{margin-top:10px;border-top:1px solid var(--grid);padding-top:8px;font-size:13px}
-.lib summary{cursor:pointer;color:var(--muted)}
-.lib ul{list-style:none;margin:8px 0 0;padding:0;columns:2 220px;column-gap:18px}
-.lib li{break-inside:avoid;padding:3px 0}
-.lib a{color:var(--text)}
-.lib .meta{display:block;font-size:11.5px;color:var(--faint)}
-.lib p{color:var(--faint);font-size:12px;margin:10px 0 0;line-height:1.5}
 footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
 @media (max-width:1100px){.grid{grid-template-columns:1fr}}
 @media (max-width:520px){.chart{height:240px}.ranges{margin-left:0}.hdr-right{margin-left:0}}
@@ -161,18 +134,12 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
       <button id="themeBtn" type="button" title="Switch light or dark">◐ Theme</button>
     </div>
   </header>
-  <div class="tape" id="tvTape" aria-label="Live ticker tape"></div>
   <div id="banner"></div>
 
   <div class="grid">
     <div class="col">
-      <section class="panel" aria-label="Live chart">
-        <h2>Live chart <span>TradingView · type any symbol in the box, or click a price row below</span></h2>
-        <div class="tv-chart" id="tvChart"></div>
-      </section>
-
       <section class="panel" aria-label="Selected chart">
-        <h2>History chart <span>our stored data · click any row or tile on the page</span></h2>
+        <h2>Chart <span>click any row or tile on the page</span></h2>
         <div class="main-head">
           <div class="main-title" id="mainTitle">—</div>
           <div class="main-val" id="mainVal"></div>
@@ -202,12 +169,6 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
 
     <div class="col">
       <section class="panel">
-        <h2>Government bonds <span>TradingView</span></h2>
-        <p class="note">TradingView doesn't allow live government yields in free embeds, so the first tab shows live bond prices (price up means yield down) and the second shows yields, which update daily for the US and monthly elsewhere. Daily UK gilt yields are in the UK rates panel below.</p>
-        <div class="tv-yields" id="tvYields"></div>
-      </section>
-
-      <section class="panel">
         <h2>US Treasury yield curve <span id="curveAsOf"></span></h2>
         <div class="upd" data-src="fred"></div>
         <div class="chart" id="curveChart" style="height:210px" tabindex="0" aria-label="Yield curve chart"></div>
@@ -232,30 +193,12 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
         <div id="calendar"></div>
       </section>
 
-      <section class="panel">
-        <h2>Headlines <span id="newsAsOf"></span></h2>
-        <div class="upd" data-src="news,finnhub_news"></div>
-        <div class="chips" id="chips"></div>
-        <ul class="news" id="news"></ul>
-      </section>
-
-      <section class="panel">
-        <h2>Research <span>free public research · opens on the publisher's site</span></h2>
-        <div class="upd" data-src="research"></div>
-        <div class="chips" id="rchips"></div>
-        <ul class="news" id="research"></ul>
-        <details class="lib">
-          <summary>Research library: free research pages with no feed</summary>
-          <ul id="library"></ul>
-          <p>Client-only, so not shown here: the full research of Goldman Sachs, JP Morgan, Morgan Stanley, Citi, Deutsche Bank, Nomura, UBS, Soci&eacute;t&eacute; G&eacute;n&eacute;rale, Santander, Cr&eacute;dit Agricole CIB and Natixis institutional research, Bernstein Research, InTouch Capital Markets, Trade The News, and the FactSet and LSEG platforms.</p>
-        </details>
-      </section>
     </div>
   </div>
 
   <footer>
-    Prices: Twelve Data (currencies, gold and bitcoin every 20 minutes on weekdays; ETFs every 15 minutes in US market hours). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Futures positioning: CFTC Commitments of Traders, legacy futures-only report (released Fridays for the prior Tuesday). UK rates and sterling: Bank of England. Calendars and some headlines: Finnhub. Other headlines and research: publishers' RSS feeds (headlines and links only; the reports stay on the publishers' sites).
-    The data refreshes on GitHub every 10 minutes (each source on its own timer, shown under each panel in UK time) and this page re-reads it every 2 minutes. Economic calendar: Forex Factory. Live chart, ticker tape and bond yields: TradingView widgets. Not investment advice.
+    Prices: Twelve Data (currencies, gold and bitcoin every 20 minutes on weekdays; ETFs every 15 minutes in US market hours). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Futures positioning: CFTC Commitments of Traders, legacy futures-only report (released Fridays for the prior Tuesday). UK rates and sterling: Bank of England. Earnings dates: Finnhub.
+    The data refreshes on GitHub every 10 minutes (each source on its own timer, shown under each panel in UK time) and this page re-reads it every 2 minutes. Economic calendar: Forex Factory. Not investment advice.
   </footer>
 </div>
 
@@ -269,48 +212,9 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 const SVGNS = "http://www.w3.org/2000/svg";
 const sv = (tag, attrs) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); return e; };
 
-let D = { prices: null, hist: null, fred: null, news: null, research: null, cot: null, boe: null, cal: null, ff: null, status: null };
+let D = { prices: null, hist: null, fred: null, cot: null, boe: null, cal: null, ff: null, status: null };
 let selected = { kind: "td", id: "SPY" };
 let range = "1Y";
-let newsFilter = "All";
-let researchFilter = "All";
-// Free research pages that have no feed: [name, what's there, link]
-const LIBRARY = [
-  ["ABN AMRO", "Group Economics research and forecasts", "https://www.abnamro.com/research/en/home"],
-  ["Barclays Private Bank", "Podcasts", "https://podcasts.apple.com/podcast/id1534752624"],
-  ["Bernstein", "Wealth market outlooks", "https://www.bernstein.com/our-insights/wealth-management-advice.html"],
-  ["CaixaBank", "CaixaBank Research publications", "https://www.caixabankresearch.com/en/publications"],
-  ["CIBC", "Economics thought leadership", "https://thoughtleadership.cibc.com/"],
-  ["Citi", "Citi GPS thematic reports", "https://www.citigroup.com/global/insights/citigps"],
-  ["Columbia Threadneedle", "Insights", "https://columbiathreadneedle.com/en/be/intermediary/insights"],
-  ["Cr\u00e9dit Agricole", "Group economic research", "https://etudes-economiques.credit-agricole.com/en/welcome-eco-website"],
-  ["Danske Bank", "Danske Research (Weekly Focus and more)", "https://research.danskebank.com/"],
-  ["DBS", "Group Research", "https://www.dbs.com.sg/sme/aics/our-approach.page"],
-  ["Deutsche Bank", "Deutsche Bank Research (public part)", "https://www.dbresearch.com/"],
-  ["DWS", "CIO View", "https://www.dws.com/en-dk/insights/cio-view/"],
-  ["FactSet", "Earnings Insight (John Butters)", "https://insight.factset.com/author/john-butters"],
-  ["Fed", "Beige Book archive", "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm"],
-  ["Goldman Sachs", "Insights", "https://www.goldmansachs.com/insights"],
-  ["HSBC Asset Management", "Investment insights", "https://www.assetmanagement.hsbc.co.uk/en/intermediary/investment-views/investment-insights"],
-  ["Invesco", "Insights", "https://invesco.com/fi/en/insights.html"],
-  ["JP Morgan", "Asset Management market updates and Guide to the Markets", "https://am.jpmorgan.com/us/en/asset-management/institutional/insights/market-insights/market-updates/"],
-  ["KBC", "KBC Economics", "https://www.kbc.com/en/kbc-economics.html"],
-  ["Lloyds Bank", "Market insights", "https://www.lloydsbank.com/business/corporate-banking/market-insights.html"],
-  ["LSEG", "Insights", "https://www.lseg.com/en/insights"],
-  ["Morgan Stanley", "Thoughts on the Market (daily podcast)", "https://www.morganstanley.com/ideas/thoughts-on-the-market"],
-  ["MUFG", "MUFG Research (FX)", "https://www.mufgresearch.com/"],
-  ["Neuberger Berman", "CIO Weekly Perspectives", "https://www.nb.com/en/fr/cio-weekly"],
-  ["Nomura", "Nomura Connects", "https://www.nomuraconnects.com/"],
-  ["OCBC", "Treasury research", "https://www.ocbc.com/business-banking/corporates/treasury-services/research"],
-  ["Scotiabank", "Economics publications", "https://www.scotiabank.com/ca/en/about/economics.html"],
-  ["SEB", "Research and strategy", "https://sebgroup.com/our-offering/research-and-strategy"],
-  ["Soci\u00e9t\u00e9 G\u00e9n\u00e9rale", "Economic research", "https://www.societegenerale.com/en/economic-research"],
-  ["Standard Chartered", "Private Banking market views", "https://www.sc.com/en/wealth-retail-banking/private-banking/latest-market-views/"],
-  ["UBS", "CIO House View", "https://www.ubs.com/global/en/wealthmanagement/insights/house-view.html"],
-  ["UniCredit", "Investment Institute", "https://www.the-investment-institute.unicredit.eu/"],
-  ["Syz Private Banking", "Market insights and outlooks", "https://blog.syzgroup.com/"],
-  ["Westpac", "Westpac IQ economics", "https://www.westpaciq.com.au/economics/"],
-];
 const RANGES = { "1M": 31, "3M": 92, "6M": 183, "1Y": 366, "2Y": 731, "5Y": 1827, "Max": 99999 };
 
 // ---------- theme
@@ -321,77 +225,7 @@ $("themeBtn").onclick = () => {
   document.documentElement.dataset.theme = next;
   try { localStorage.setItem("mt-theme", next); } catch (e) {}
   renderAll();
-  drawTV();
 };
-
-// ---------- TradingView widgets (free embeds; they load live data straight from TradingView)
-const TV_SYMBOL = {
-  "SPY": "AMEX:SPY", "QQQ": "NASDAQ:QQQ", "DIA": "AMEX:DIA", "IWM": "AMEX:IWM", "EFA": "AMEX:EFA", "EEM": "AMEX:EEM",
-  "EUR/USD": "FX:EURUSD", "USD/JPY": "FX:USDJPY", "GBP/USD": "FX:GBPUSD", "USD/CNY": "FX_IDC:USDCNY",
-  "AUD/USD": "FX:AUDUSD", "USD/CAD": "FX:USDCAD", "XAU/USD": "OANDA:XAUUSD", "SLV": "AMEX:SLV", "USO": "AMEX:USO",
-  "BTC/USD": "BITSTAMP:BTCUSD",
-};
-let tvSymbol = "FOREXCOM:SPXUSD";
-try { tvSymbol = localStorage.getItem("mt-tv-symbol") || tvSymbol; } catch (e) {}
-const tvTheme = () => (document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
-function tvEmbed(container, name, config, credit) {
-  container.replaceChildren();
-  const wrap = el("div", "tradingview-widget-container");
-  const inner = el("div", "tradingview-widget-container__widget");
-  const cr = el("div", "tradingview-widget-copyright");
-  const a = el("a", "", credit || "Live data by TradingView"); a.href = "https://www.tradingview.com/"; a.target = "_blank"; a.rel = "noopener nofollow"; cr.append(a);
-  const sc = document.createElement("script");
-  sc.type = "text/javascript"; sc.async = true;
-  sc.src = "https://s3.tradingview.com/external-embedding/embed-widget-" + name + ".js";
-  sc.textContent = JSON.stringify(config);
-  wrap.append(inner, cr, sc);
-  container.append(wrap);
-}
-function drawTVChart() {
-  const dark = tvTheme() === "dark";
-  tvEmbed($("tvChart"), "advanced-chart", {
-    autosize: true, symbol: tvSymbol, interval: "D", timezone: "Europe/London", theme: tvTheme(), style: "1", locale: "en",
-    allow_symbol_change: true, calendar: false, hide_side_toolbar: false, save_image: false,
-    backgroundColor: dark ? "#191919" : "#ffffff", gridColor: dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
-    support_host: "https://www.tradingview.com",
-  });
-}
-function drawTV() {
-  const theme = tvTheme();
-  tvEmbed($("tvTape"), "ticker-tape", {
-    symbols: [
-      { proName: "FOREXCOM:SPXUSD", title: "S&P 500" }, { proName: "FOREXCOM:NSXUSD", title: "Nasdaq 100" },
-      { proName: "FOREXCOM:DJI", title: "Dow" }, { proName: "FOREXCOM:UKXGBP", title: "FTSE 100" },
-      { proName: "INDEX:DEU40", title: "DAX" }, { proName: "OANDA:USB10YUSD", title: "US 10Y bond price" }, { proName: "OANDA:UK10YBGBP", title: "UK gilt price" },
-      { proName: "FX:EURUSD", title: "EUR/USD" }, { proName: "FX:GBPUSD", title: "GBP/USD" },
-      { proName: "FX:USDJPY", title: "USD/JPY" }, { proName: "OANDA:XAUUSD", title: "Gold" }, { proName: "TVC:USOIL", title: "WTI oil" },
-      { proName: "TVC:UKOIL", title: "Brent" }, { proName: "BITSTAMP:BTCUSD", title: "Bitcoin" },
-    ],
-    showSymbolLogo: false, isTransparent: true, displayMode: "adaptive", colorTheme: theme, locale: "en",
-  });
-  drawTVChart();
-  tvEmbed($("tvYields"), "market-quotes", {
-    width: "100%", height: "100%", showSymbolLogo: false, isTransparent: false, colorTheme: theme, locale: "en",
-    symbolsGroups: [
-      { name: "Live bond prices", symbols: [
-        { name: "OANDA:USB02YUSD", displayName: "US 2-year note" }, { name: "OANDA:USB10YUSD", displayName: "US 10-year note" },
-        { name: "OANDA:USB30YUSD", displayName: "US 30-year bond" }, { name: "OANDA:UK10YBGBP", displayName: "UK 10-year gilt" },
-        { name: "OANDA:DE10YBEUR", displayName: "German 10-year Bund" },
-      ] },
-      { name: "Yields %", symbols: [
-        { name: "FRED:DGS2", displayName: "US 2-year (daily)" }, { name: "FRED:DGS10", displayName: "US 10-year (daily)" },
-        { name: "FRED:DGS30", displayName: "US 30-year (daily)" }, { name: "FRED:IRLTLT01GBM156N", displayName: "UK 10-year (monthly avg)" },
-        { name: "FRED:IRLTLT01DEM156N", displayName: "German 10-year (monthly avg)" }, { name: "FRED:IRLTLT01JPM156N", displayName: "Japan 10-year (monthly avg)" },
-      ] },
-    ],
-  });
-}
-function setTVSymbol(sym) {
-  if (!sym || sym === tvSymbol) return;
-  tvSymbol = sym;
-  try { localStorage.setItem("mt-tv-symbol", sym); } catch (e) {}
-  drawTVChart();
-}
 
 // ---------- formatting
 const fmt = (v, d) => v == null || isNaN(v) ? "—" : v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -429,9 +263,9 @@ const ukTime = iso => {
   return day === today ? t : day + " " + t;
 };
 const SRC_LABEL = { prices_fx: "FX, gold & bitcoin", prices_us: "ETFs", fred: "FRED", boe: "Bank of England", cot: "CFTC",
-  news: "RSS feeds", research: "research feeds", finnhub_news: "Finnhub", calendar: "earnings & US dates", forexfactory: "Forex Factory", price_history: "price history" };
+  calendar: "earnings & US dates", forexfactory: "Forex Factory", price_history: "price history" };
 const SRC_EVERY = { prices_fx: "every 20 min on weekdays", prices_us: "every 15 min in US market hours", fred: "every 30 min", boe: "every 30 min",
-  cot: "every 10 min (new report weekly)", news: "every 10 min", research: "hourly", finnhub_news: "every 10 min", calendar: "hourly", forexfactory: "every 30 min", price_history: "daily" };
+  cot: "every 10 min (new report weekly)", calendar: "hourly", forexfactory: "every 30 min", price_history: "daily" };
 function stampNode(srcs) {
   const st = D.status && D.status.sources || {};
   const box = el("div", "upd");
@@ -643,7 +477,7 @@ function drawMarkets() {
         const c2 = el("td"); c2.append(chgNode(q.pct, (q.pct > 0 ? "+" : "") + fmt(q.pct, 2) + "%")); if (q.error) { c2.append(el("span", "stale", " old")); c2.title = "Latest refresh failed: " + q.error; } r.append(c2);
         const c3 = el("td"); c3.append(spark((D.hist && D.hist.series[q.symbol] || []).slice(-252))); r.append(c3);
       }
-      const pick = () => { selected = { kind: "td", id: q.symbol }; setTVSymbol(TV_SYMBOL[q.symbol]); renderAll(); };
+      const pick = () => { selected = { kind: "td", id: q.symbol }; renderAll(); };
       r.onclick = pick; r.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
       t.append(r);
     });
@@ -787,52 +621,6 @@ function drawEcon() {
   });
 }
 
-// ---------- news
-function drawNews() {
-  const items = D.news && D.news.items || [];
-  const src = i => i.via || i.source;
-  const sources = ["All", ...new Set(items.map(src))];
-  if (!sources.includes(newsFilter)) newsFilter = "All";
-  $("chips").replaceChildren(...sources.map(s => { const b = el("button", "", s); b.type = "button"; b.setAttribute("aria-pressed", s === newsFilter); b.onclick = () => { newsFilter = s; drawNews(); }; return b; }));
-  const ul = $("news"); ul.replaceChildren();
-  const shown = items.filter(i => newsFilter === "All" || src(i) === newsFilter).slice(0, 50);
-  if (!shown.length) ul.append(el("li", "empty", "No headlines yet."));
-  shown.forEach(i => {
-    const li = el("li");
-    if (/^https:\/\//.test(i.link)) { const a = el("a", "", i.title); a.href = i.link; a.target = "_blank"; a.rel = "noopener noreferrer"; li.append(a); }
-    else li.append(el("span", "", i.title));
-    li.append(el("span", "meta", (i.via ? i.via + " · " : "") + i.source + (i.published ? " · " + relTime(i.published) : "")));
-    ul.append(li);
-  });
-
-}
-
-// ---------- research
-function drawResearch() {
-  const items = D.research && D.research.items || [];
-  const sources = ["All", ...new Set(items.map(i => i.source))];
-  if (!sources.includes(researchFilter)) researchFilter = "All";
-  $("rchips").replaceChildren(...sources.map(s => { const b = el("button", "", s); b.type = "button"; b.setAttribute("aria-pressed", s === researchFilter); b.onclick = () => { researchFilter = s; drawResearch(); }; return b; }));
-  const ul = $("research"); ul.replaceChildren();
-  const shown = items.filter(i => researchFilter === "All" || i.source === researchFilter).slice(0, 60);
-  if (!shown.length) ul.append(el("li", "empty", "No research headlines yet. They arrive with the next refresh."));
-  shown.forEach(i => {
-    const li = el("li");
-    if (/^https:\/\//.test(i.link)) { const a = el("a", "", i.title); a.href = i.link; a.target = "_blank"; a.rel = "noopener noreferrer"; li.append(a); }
-    else li.append(el("span", "", i.title));
-    li.append(el("span", "meta", i.source + (i.published ? " · " + relTime(i.published) : "")));
-    ul.append(li);
-  });
-}
-function drawLibrary() {
-  $("library").replaceChildren(...LIBRARY.map(([name, what, url]) => {
-    const li = el("li"), a = el("a", "", name);
-    a.href = url; a.target = "_blank"; a.rel = "noopener noreferrer";
-    li.append(a, el("span", "meta", what));
-    return li;
-  }));
-}
-
 // ---------- header + problems
 function drawHeader() {
   const s = $("stamps"); s.replaceChildren();
@@ -845,7 +633,7 @@ function drawHeader() {
   const bad = (D.prices && D.prices.quotes || []).filter(q => q.error).map(q => q.symbol);
   if (bad.length) errs.push("Some symbols could not be refreshed: " + bad.join(", "));
   const b = $("banner"); b.replaceChildren();
-  if (!D.prices && !D.fred && !D.news) {
+  if (!D.prices && !D.fred) {
     const box = el("div", "banner", "No data yet. The first automatic refresh fills this page. You can start one now from the repository's Actions tab: Refresh market data, then Run workflow.");
     b.append(box);
   } else if (stale) {
@@ -863,7 +651,7 @@ function drawRanges() {
 
 function renderAll() {
   hideTip();
-  drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawCot(); drawRates(); drawUK(); drawCalendar(); drawStamps(); drawCurve(); drawEcon(); drawNews(); drawResearch();
+  drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawCot(); drawRates(); drawUK(); drawCalendar(); drawStamps(); drawCurve(); drawEcon();
 }
 
 // ---------- loading
@@ -872,16 +660,14 @@ async function getJSON(name) {
   catch (e) { return null; }
 }
 async function load() {
-  const names = ["prices", "price_history", "fred", "news", "research", "cot", "boe", "calendar", "ff", "status"];
+  const names = ["prices", "price_history", "fred", "cot", "boe", "calendar", "ff", "status"];
   const got = await Promise.all(names.map(n => getJSON(n + ".json")));
-  const keys = ["prices", "hist", "fred", "news", "research", "cot", "boe", "cal", "ff", "status"];
+  const keys = ["prices", "hist", "fred", "cot", "boe", "cal", "ff", "status"];
   const next = {}; keys.forEach((k, i) => next[k] = got[i] || D[k]); D = next;
   renderAll();
 }
 let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderAll, 150); });
-drawLibrary();
 load();
-drawTV();
 setInterval(load, 2 * 60 * 1000);
 })();
 </script>
