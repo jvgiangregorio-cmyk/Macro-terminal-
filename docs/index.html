@@ -114,7 +114,7 @@ details.tbl table{margin-top:6px;max-width:360px}
 /* TradingView widgets */
 .tape{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:14px;min-height:46px;overflow:hidden}
 .tv-chart{height:560px}
-.tv-yields{height:330px}
+.tv-yields{height:340px}
 .tv-chart .tradingview-widget-container,.tv-yields .tradingview-widget-container{height:100%;width:100%}
 .tv-chart .tradingview-widget-container__widget,.tv-yields .tradingview-widget-container__widget{height:calc(100% - 32px);width:100%}
 .tradingview-widget-copyright{font-size:11px;color:var(--faint);line-height:32px}
@@ -194,7 +194,8 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
 
     <div class="col">
       <section class="panel">
-        <h2>Government bond yields <span>live · TradingView</span></h2>
+        <h2>Government bonds <span>TradingView</span></h2>
+        <p class="note">TradingView doesn't allow live government yields in free embeds, so the first tab shows live bond prices (price up means yield down) and the second shows yields, which update daily for the US and monthly elsewhere. Daily UK gilt yields are in the UK rates panel below.</p>
         <div class="tv-yields" id="tvYields"></div>
       </section>
 
@@ -303,8 +304,8 @@ function drawTV() {
     symbols: [
       { proName: "FOREXCOM:SPXUSD", title: "S&P 500" }, { proName: "FOREXCOM:NSXUSD", title: "Nasdaq 100" },
       { proName: "FOREXCOM:DJI", title: "Dow" }, { proName: "FOREXCOM:UKXGBP", title: "FTSE 100" },
-      { proName: "INDEX:DEU40", title: "DAX" }, { proName: "TVC:US10Y", title: "US 10Y" }, { proName: "TVC:GB10Y", title: "UK 10Y" },
-      { proName: "TVC:DXY", title: "Dollar index" }, { proName: "FX:EURUSD", title: "EUR/USD" }, { proName: "FX:GBPUSD", title: "GBP/USD" },
+      { proName: "INDEX:DEU40", title: "DAX" }, { proName: "OANDA:USB10YUSD", title: "US 10Y bond price" }, { proName: "OANDA:UK10YBGBP", title: "UK gilt price" },
+      { proName: "FX:EURUSD", title: "EUR/USD" }, { proName: "FX:GBPUSD", title: "GBP/USD" },
       { proName: "FX:USDJPY", title: "USD/JPY" }, { proName: "OANDA:XAUUSD", title: "Gold" }, { proName: "TVC:USOIL", title: "WTI oil" },
       { proName: "TVC:UKOIL", title: "Brent" }, { proName: "BITSTAMP:BTCUSD", title: "Bitcoin" },
     ],
@@ -312,12 +313,19 @@ function drawTV() {
   });
   drawTVChart();
   tvEmbed($("tvYields"), "market-quotes", {
-    width: "100%", height: "100%", showSymbolLogo: false, isTransparent: true, colorTheme: theme, locale: "en",
-    symbolsGroups: [{ name: "10-year and US curve", symbols: [
-      { name: "TVC:US02Y", displayName: "US 2-year" }, { name: "TVC:US10Y", displayName: "US 10-year" },
-      { name: "TVC:US30Y", displayName: "US 30-year" }, { name: "TVC:GB10Y", displayName: "UK 10-year gilt" },
-      { name: "TVC:DE10Y", displayName: "German 10-year Bund" }, { name: "TVC:JP10Y", displayName: "Japan 10-year JGB" },
-    ] }],
+    width: "100%", height: "100%", showSymbolLogo: false, isTransparent: false, colorTheme: theme, locale: "en",
+    symbolsGroups: [
+      { name: "Live bond prices", symbols: [
+        { name: "OANDA:USB02YUSD", displayName: "US 2-year note" }, { name: "OANDA:USB10YUSD", displayName: "US 10-year note" },
+        { name: "OANDA:USB30YUSD", displayName: "US 30-year bond" }, { name: "OANDA:UK10YBGBP", displayName: "UK 10-year gilt" },
+        { name: "OANDA:DE10YBEUR", displayName: "German 10-year Bund" },
+      ] },
+      { name: "Yields %", symbols: [
+        { name: "FRED:DGS2", displayName: "US 2-year (daily)" }, { name: "FRED:DGS10", displayName: "US 10-year (daily)" },
+        { name: "FRED:DGS30", displayName: "US 30-year (daily)" }, { name: "FRED:IRLTLT01GBM156N", displayName: "UK 10-year (monthly avg)" },
+        { name: "FRED:IRLTLT01DEM156N", displayName: "German 10-year (monthly avg)" }, { name: "FRED:IRLTLT01JPM156N", displayName: "Japan 10-year (monthly avg)" },
+      ] },
+    ],
   });
 }
 function setTVSymbol(sym) {
