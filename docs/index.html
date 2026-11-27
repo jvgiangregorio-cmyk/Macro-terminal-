@@ -111,6 +111,41 @@ details.tbl table{margin-top:6px;max-width:360px}
 .cal-row.past{opacity:.5}
 .tag{display:inline-block;font:600 10px "IBM Plex Mono",monospace;padding:1px 5px;border-radius:4px;border:1px solid var(--line);color:var(--muted);margin-left:6px;vertical-align:1px}
 .tag.hi{border-color:var(--down);color:var(--down)}
+/* tabs */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:-4px 0 14px}
+.tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:8px 14px;font:500 13px "IBM Plex Mono",monospace;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.tabs button:hover{background:transparent;color:var(--text)}
+.tabs button[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
+/* chart overlays */
+.ov-panel{padding:12px 14px 10px}
+.ov-controls{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:10px}
+.ov-field{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.ov-field select{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 8px;max-width:320px}
+.ov-group{display:flex;gap:4px}
+.ov-group button{font-size:12px;padding:2px 9px}
+.ov-chart{position:relative;height:max(420px,calc(100vh - 330px));background:var(--ov-bg);border-radius:8px}
+.ov-chart svg{display:block;width:100%;height:100%}
+.ov-chart text{font:11px "IBM Plex Mono",monospace;fill:var(--faint)}
+.ov-chart .ev-label rect{fill:var(--ov-bg);stroke:var(--ev)}
+.ov-chart .ev-label text{fill:var(--ev);font-size:10.5px}
+.ov-legend{display:flex;flex-wrap:wrap;gap:6px 22px;padding:10px 2px 4px;border-top:1px solid var(--line);margin-top:8px;font:12px "IBM Plex Mono",monospace}
+.ov-item{display:flex;align-items:center;gap:7px;white-space:nowrap}
+.ov-item .sw{width:11px;height:11px;border-radius:3px;flex:none}
+.ov-item .nm{font-weight:600;color:var(--text)}
+.ov-item .pri{color:var(--faint);font-weight:400}
+.ov-item .val{color:var(--text)}
+.ov-item .live{color:var(--up)} .ov-item .freq{color:var(--faint)}
+.ov-item .r{color:var(--muted)}
+.ov-item button{padding:0 6px;font-size:11px;line-height:18px}
+.ov-events{margin-top:6px;font-size:13px;color:var(--muted)}
+.ov-events summary{cursor:pointer}
+.ov-event-form{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.ov-event-form input{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 8px}
+#ovEventList{list-style:none;margin:0;padding:0}
+#ovEventList li{display:flex;gap:10px;align-items:center;padding:3px 0;font-family:"IBM Plex Mono",monospace;font-size:12px}
+:root{--ov-bg:#fbfbf9;--ev:#b8860b}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ov-bg:#111111;--ev:#d9a933}}
+:root[data-theme="dark"]{--ov-bg:#111111;--ev:#d9a933}
 /* economy */
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .tile{border:1px solid var(--line);border-radius:8px;padding:10px;cursor:pointer;background:transparent;text-align:left}
@@ -134,7 +169,13 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
       <button id="themeBtn" type="button" title="Switch light or dark">◐ Theme</button>
     </div>
   </header>
+  <nav class="tabs" role="tablist" aria-label="Pages">
+    <button type="button" role="tab" id="tabbtn-home" data-tab="home">Homepage</button>
+    <button type="button" role="tab" id="tabbtn-overlays" data-tab="overlays">Chart overlays</button>
+  </nav>
   <div id="banner"></div>
+
+  <div id="tab-home" role="tabpanel" aria-labelledby="tabbtn-home">
 
   <div class="grid">
     <div class="col">
@@ -194,6 +235,34 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
       </section>
 
     </div>
+  </div>
+  </div>
+
+  <div id="tab-overlays" role="tabpanel" aria-labelledby="tabbtn-overlays" hidden>
+    <section class="panel ov-panel">
+      <div class="ov-controls">
+        <label class="ov-field">Add a series
+          <select id="ovAdd"></select>
+        </label>
+        <div class="ov-group" role="group" aria-label="Scale">
+          <button type="button" data-mode="dual">Own scales</button>
+          <button type="button" data-mode="rebased">Rebased to 100</button>
+        </div>
+        <div class="ranges" id="ovRanges" role="group" aria-label="Time range"></div>
+      </div>
+      <div class="ov-chart" id="ovChart" tabindex="0" aria-label="Overlay chart. Use left and right arrow keys to read values."></div>
+      <div class="ov-legend" id="ovLegend"></div>
+      <details class="ov-events">
+        <summary>Event markers</summary>
+        <form id="ovEventForm" class="ov-event-form">
+          <input type="date" id="ovEventDate" required aria-label="Event date">
+          <input type="text" id="ovEventLabel" required maxlength="40" placeholder="Label, e.g. Fed cut" aria-label="Event label">
+          <button type="submit">Add marker</button>
+        </form>
+        <ul id="ovEventList"></ul>
+        <p class="note">Markers and your chosen series are saved in this browser only.</p>
+      </details>
+    </section>
   </div>
 
   <footer>
@@ -651,8 +720,244 @@ function drawRanges() {
 
 function renderAll() {
   hideTip();
+  if (activeTab === "overlays") { drawHeader(); drawOverlay(); return; }
   drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawCot(); drawRates(); drawUK(); drawCalendar(); drawStamps(); drawCurve(); drawEcon();
 }
+
+// ---------- tabs
+let activeTab = "home";
+try { activeTab = location.hash === "#overlays" ? "overlays" : (localStorage.getItem("mt-tab") || "home"); } catch (e) {}
+function showTab(name) {
+  activeTab = name;
+  document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === name));
+  $("tab-home").hidden = name !== "home";
+  $("tab-overlays").hidden = name !== "overlays";
+  try { localStorage.setItem("mt-tab", name); history.replaceState(null, "", name === "overlays" ? "#overlays" : location.pathname); } catch (e) {}
+  hideTip();
+  if (name === "overlays") drawOverlay(); else renderAll();
+}
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+
+// ---------- chart overlays
+const OV_COLORS = ["#b44fe0", "#e8457f", "#f59a7a", "#4fa8e8", "#3fc58f", "#e8b84a", "#8f86f0", "#9aa3ad"];
+const OV_MAX = OV_COLORS.length;
+const OV_RANGES = { "1M": 31, "3M": 92, "6M": 183, "1Y": 366, "2Y": 731, "5Y": 1827, "10Y": 3653, "Max": 99999 };
+let OV = { series: ["td:SPY", "td:QQQ", "fred:DGS10"], primary: "td:SPY", mode: "dual", range: "6M", events: [] };
+try { const saved = JSON.parse(localStorage.getItem("mt-overlay") || "null"); if (saved && Array.isArray(saved.series)) OV = Object.assign(OV, saved); } catch (e) {}
+const ovSave = () => { try { localStorage.setItem("mt-overlay", JSON.stringify(OV)); } catch (e) {} };
+
+function tdPoints(sym) {
+  const q = (D.prices && D.prices.quotes || []).find(q => q.symbol === sym);
+  const pts = (D.hist && D.hist.series[sym] || []).slice();
+  if (q && q.price != null && q.as_of) {
+    const day = q.as_of.slice(0, 10);
+    if (pts.length && pts.at(-1)[0] === day) pts[pts.length - 1] = [day, q.price];
+    else if (!pts.length || pts.at(-1)[0] < day) pts.push([day, q.price]);
+  }
+  return pts;
+}
+// Every series the terminal collects, as one catalogue: key -> {name, group, pts, fmt, freq, src}
+function ovCatalogue() {
+  const cat = {};
+  (D.prices && D.prices.quotes || []).forEach(q => {
+    cat["td:" + q.symbol] = { name: q.name, short: q.symbol, group: "Prices", pts: () => tdPoints(q.symbol),
+      fmt: v => fmt(v, priceDigits(q.symbol, v)), freq: "live", src: q.symbol.includes("/") ? "prices_fx" : "prices_us" };
+  });
+  [["fred", D.fred], ["boe", D.boe]].forEach(([k, src]) => Object.entries(src && src.series || {}).forEach(([id, s]) => {
+    const full = Object.assign({ id }, s);
+    const grp = k === "boe" ? "UK (Bank of England)" : s.group === "Economy" ? "Economy (FRED)" : s.group === "Rates" ? "US rates (FRED)" : "Credit, risk & energy (FRED)";
+    const monthly = s.group === "Economy" && !["ICSA"].includes(id);
+    cat[k + ":" + id] = { name: s.name, short: id, group: grp, pts: () => s.obs, fmt: v => fmtFred(full, v),
+      freq: id === "GDPC1" ? "quarterly" : monthly ? "monthly" : ["ICSA", "MORTGAGE30US"].includes(id) ? "weekly" : "daily", src: k };
+  }));
+  (D.cot && D.cot.markets || []).forEach(m => {
+    cat["cot:" + m.code] = { name: m.name + " spec net", short: "COT " + m.name, group: "Futures positioning (COT)",
+      pts: () => m.obs.map(p => [p[0], p[1]]), fmt: v => fmt(v, 0), freq: "weekly", src: "cot" };
+  });
+  return cat;
+}
+
+function ovControls(cat) {
+  const sel = $("ovAdd"); sel.replaceChildren();
+  const first = el("option", "", OV.series.length >= OV_MAX ? "Chart is full (" + OV_MAX + " series)" : "Choose…"); first.value = ""; sel.append(first);
+  const groups = {};
+  Object.entries(cat).forEach(([k, c]) => { if (!OV.series.includes(k)) (groups[c.group] = groups[c.group] || []).push([k, c]); });
+  Object.entries(groups).forEach(([g, items]) => {
+    const og = document.createElement("optgroup"); og.label = g;
+    items.forEach(([k, c]) => { const o = el("option", "", c.name + (c.short && c.short !== c.name ? " (" + c.short + ")" : "")); o.value = k; og.append(o); });
+    sel.append(og);
+  });
+  sel.disabled = OV.series.length >= OV_MAX;
+  sel.onchange = () => { if (sel.value) { OV.series.push(sel.value); if (!OV.primary || !OV.series.includes(OV.primary)) OV.primary = sel.value; ovSave(); drawOverlay(); } };
+  document.querySelectorAll(".ov-group button").forEach(b => { b.setAttribute("aria-pressed", b.dataset.mode === OV.mode); b.onclick = () => { OV.mode = b.dataset.mode; ovSave(); drawOverlay(); }; });
+  $("ovRanges").replaceChildren(...Object.keys(OV_RANGES).map(k => { const b = el("button", "", k); b.type = "button"; b.setAttribute("aria-pressed", k === OV.range); b.onclick = () => { OV.range = k; ovSave(); drawOverlay(); }; return b; }));
+}
+
+const tms = d => Date.parse(d + "T00:00:00Z");
+function valueOn(pts, d) { // last value at or before date d (pts sorted)
+  let lo = 0, hi = pts.length - 1, ans = null;
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (pts[mid][0] <= d) { ans = pts[mid][1]; lo = mid + 1; } else hi = mid - 1; }
+  return ans;
+}
+function corr(a, b) {
+  const n = a.length; if (n < 5) return null;
+  const ma = a.reduce((x, y) => x + y, 0) / n, mb = b.reduce((x, y) => x + y, 0) / n;
+  let sab = 0, saa = 0, sbb = 0;
+  for (let i = 0; i < n; i++) { const da = a[i] - ma, db = b[i] - mb; sab += da * db; saa += da * da; sbb += db * db; }
+  return saa && sbb ? sab / Math.sqrt(saa * sbb) : null;
+}
+
+function drawOverlay() {
+  if (activeTab !== "overlays") return;
+  const cat = ovCatalogue();
+  OV.series = OV.series.filter(k => cat[k] || !D.prices);   // drop series that no longer exist
+  if (!OV.series.includes(OV.primary)) OV.primary = OV.series[0] || null;
+  ovControls(cat);
+  const box = $("ovChart"); box.replaceChildren(); $("ovLegend").replaceChildren();
+  drawOvEvents();
+  const list = OV.series.filter(k => cat[k]).map((k, i) => ({ key: k, c: cat[k], color: OV_COLORS[OV.series.indexOf(k) % OV_COLORS.length] }));
+  if (!list.length) { box.append(el("div", "empty", "Add a series above to start. You can overlay up to " + OV_MAX + ".")); return; }
+  // date window: ends at the newest point of any series
+  let end = "";
+  list.forEach(s => { const p = s.c.pts(); if (p.length && p.at(-1)[0] > end) end = p.at(-1)[0]; });
+  const startD = new Date(tms(end) - OV_RANGES[OV.range] * 864e5).toISOString().slice(0, 10);
+  list.forEach(s => {
+    const all = s.c.pts();
+    s.pts = all.filter(p => p[0] >= startD);
+    // carry the line in from the last point before the window (monthly data)
+    const before = valueOn(all, startD);
+    if (before != null && (!s.pts.length || s.pts[0][0] > startD)) s.pts.unshift([startD, before]);
+    if (OV.mode === "rebased" && s.pts.length) { const b = s.pts[0][1]; s.plot = s.pts.map(p => [p[0], b ? 100 + (p[1] - b) / Math.abs(b) * 100 : null]); }
+    else s.plot = s.pts;
+  });
+  const pri = list.find(s => s.key === OV.primary) || list[0];
+  const W = box.clientWidth || 900, H = box.clientHeight || 480;
+  const m = { l: 62, r: 62, t: 14, b: 28 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const t0 = tms(startD), t1 = tms(end) || t0 + 864e5;
+  const X = d => m.l + (tms(d) - t0) / Math.max(1, t1 - t0) * iw;
+  const range = pts => { const v = pts.map(p => p[1]).filter(v => v != null); if (!v.length) return [0, 1]; let lo = Math.min(...v), hi = Math.max(...v); const pad = (hi - lo) * 0.06 || Math.abs(hi) * 0.01 || 1; return [lo - pad, hi + pad]; };
+  // scales: rebased = one shared scale; own scales = primary left, every other series fitted to its own range (right axis shows the first one)
+  let shared = null;
+  if (OV.mode === "rebased") { const v = list.flatMap(s => s.plot); shared = range(v); }
+  list.forEach(s => { s.dom = shared || range(s.plot); s.Y = v => m.t + (1 - (v - s.dom[0]) / (s.dom[1] - s.dom[0])) * ih; });
+  const right = OV.mode === "rebased" ? null : list.find(s => s !== pri);
+  const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Overlay of " + list.map(s => s.c.name).join(", ") });
+  const defs = sv("defs"); svg.append(defs);
+  // grid + left axis (primary or shared)
+  const left = OV.mode === "rebased" ? { dom: shared, Y: list[0].Y, fmt: v => fmt(v, 0) } : { dom: pri.dom, Y: pri.Y, fmt: pri.c.fmt };
+  const lt = niceTicks(left.dom[0], left.dom[1], 6);
+  lt.ticks.forEach(t => {
+    svg.append(sv("line", { x1: m.l, x2: m.l + iw, y1: left.Y(t), y2: left.Y(t), stroke: "var(--grid)" }));
+    const tx = sv("text", { x: m.l - 8, y: left.Y(t) + 4, "text-anchor": "end" }); tx.textContent = OV.mode === "rebased" ? fmt(t, 0) : left.fmt(t); svg.append(tx);
+  });
+  if (right) {
+    niceTicks(right.dom[0], right.dom[1], 6).ticks.forEach(t => {
+      const tx = sv("text", { x: m.l + iw + 8, y: right.Y(t) + 4, style: "fill:" + right.color }); tx.textContent = right.c.fmt(t); svg.append(tx);
+    });
+  }
+  if (OV.mode === "rebased") svg.append(sv("line", { x1: m.l, x2: m.l + iw, y1: left.Y(100), y2: left.Y(100), stroke: "var(--faint)", "stroke-dasharray": "3 3" }));
+  // x labels
+  const nLab = Math.max(2, Math.floor(iw / 110)), spanDays = (t1 - t0) / 864e5;
+  for (let k = 0; k < nLab; k++) {
+    const t = t0 + (t1 - t0) * k / (nLab - 1), d = new Date(t);
+    const tx = sv("text", { x: m.l + iw * k / (nLab - 1), y: H - 8, "text-anchor": k === 0 ? "start" : k === nLab - 1 ? "end" : "middle" });
+    tx.textContent = d.toLocaleDateString("en-GB", spanDays > 400 ? { month: "short", year: "2-digit", timeZone: "UTC" } : { day: "numeric", month: "short", timeZone: "UTC" });
+    svg.append(tx);
+  }
+  // series: area fill (gradient) then line; primary drawn last so it sits on top
+  const order = list.filter(s => s !== pri).concat([pri]);
+  order.forEach((s, i) => {
+    const pts = s.plot.filter(p => p[1] != null); if (pts.length < 2) return;
+    const gid = "ovg" + OV.series.indexOf(s.key);
+    const g = sv("linearGradient", { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 });
+    g.append(sv("stop", { offset: "0%", "stop-color": s.color, "stop-opacity": s === pri ? 0.42 : 0.22 }), sv("stop", { offset: "100%", "stop-color": s.color, "stop-opacity": 0 }));
+    defs.append(g);
+    const line = pts.map((p, j) => (j ? "L" : "M") + X(p[0]).toFixed(1) + "," + s.Y(p[1]).toFixed(1)).join("");
+    svg.append(sv("path", { d: line + `L${X(pts.at(-1)[0]).toFixed(1)},${m.t + ih}L${X(pts[0][0]).toFixed(1)},${m.t + ih}Z`, fill: `url(#${gid})` }));
+    svg.append(sv("path", { d: line, fill: "none", stroke: s.color, "stroke-width": s === pri ? 2 : 1.6, "stroke-linejoin": "round" }));
+  });
+  // event markers
+  OV.events.filter(e => e.date >= startD && e.date <= end).forEach(e => {
+    const x = X(e.date);
+    svg.append(sv("line", { x1: x, x2: x, y1: m.t, y2: m.t + ih, stroke: "var(--ev)", "stroke-dasharray": "2 3" }));
+    const g = sv("g", { class: "ev-label" });
+    const tx = sv("text", { y: m.t + 14 }); tx.textContent = e.label; g.append(tx);
+    svg.append(g);
+    const w = Math.min(240, e.label.length * 6.4 + 10);
+    const lx = Math.min(Math.max(x - w / 2, m.l), m.l + iw - w);
+    tx.setAttribute("x", lx + 5);
+    g.insertBefore(sv("rect", { x: lx, y: m.t + 2, width: w, height: 17, rx: 2 }), tx);
+  });
+  // crosshair + tooltip
+  const xh = sv("line", { y1: m.t, y2: m.t + ih, stroke: "var(--faint)", "stroke-dasharray": "2 3", visibility: "hidden" }); svg.append(xh);
+  const dots = list.map(s => { const c = sv("circle", { r: 4, fill: s.color, stroke: "var(--ov-bg)", "stroke-width": 2, visibility: "hidden" }); svg.append(c); return c; });
+  const hit = sv("rect", { x: m.l, y: m.t, width: iw, height: ih, fill: "transparent" }); svg.append(hit);
+  box.append(svg);
+  let curT = null;
+  const show = t => {
+    t = Math.max(t0, Math.min(t1, t)); curT = t;
+    const d = new Date(t).toISOString().slice(0, 10), x = X(d);
+    xh.setAttribute("x1", x); xh.setAttribute("x2", x); xh.setAttribute("visibility", "visible");
+    const rows = [el("div", "k", new Date(t).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }))];
+    list.forEach((s, j) => {
+      const raw = valueOn(s.pts, d), pv = valueOn(s.plot, d);
+      if (raw == null) { dots[j].setAttribute("visibility", "hidden"); return; }
+      dots[j].setAttribute("cx", x); dots[j].setAttribute("cy", s.Y(pv)); dots[j].setAttribute("visibility", "visible");
+      const r = el("div"); const sw = el("span", "sw"); sw.style.background = s.color;
+      r.append(sw, document.createTextNode(s.c.short + "  " + s.c.fmt(raw) + (OV.mode === "rebased" ? "  (" + fmt(pv, 1) + ")" : "")));
+      rows.push(r);
+    });
+    showTip(box, x * box.clientWidth / W, 40, rows);
+  };
+  const hide = () => { xh.setAttribute("visibility", "hidden"); dots.forEach(d => d.setAttribute("visibility", "hidden")); hideTip(); curT = null; };
+  hit.addEventListener("pointermove", e => { const r = box.getBoundingClientRect(); const x = (e.clientX - r.left) * W / r.width; show(t0 + (x - m.l) / iw * (t1 - t0)); });
+  hit.addEventListener("pointerleave", hide);
+  box.onkeydown = e => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); show((curT ?? t1) + (e.key === "ArrowRight" ? 1 : -1) * 864e5); } else if (e.key === "Escape") hide(); };
+  box.onblur = hide;
+  // legend: last value, freshness, % change over the window, correlation with the primary
+  const st = D.status && D.status.sources || {};
+  list.forEach(s => {
+    const it = el("div", "ov-item"); const sw = el("span", "sw"); sw.style.background = s.color; it.append(sw);
+    const nm = el("span", "nm", s.c.short); if (s === pri) nm.append(el("span", "pri", " primary")); it.append(nm);
+    const last = s.pts.length ? s.pts.at(-1)[1] : null, first = s.pts.length ? s.pts[0][1] : null;
+    it.append(el("span", "val", last == null ? "—" : s.c.fmt(last)));
+    const checked = st[s.c.src] && st[s.c.src].checked;
+    const live = s.c.freq === "live" && checked && Date.now() - new Date(checked) < 40 * 60000;
+    it.append(el("span", live ? "live" : "freq", live ? "● LIVE" : s.c.freq));
+    if (last != null && first) {
+      const pct = (last / first - 1) * 100;
+      const useDiff = s.key.startsWith("fred:") || s.key.startsWith("boe:") ? /%|pp/.test((cat[s.key] && (D.fred && D.fred.series[s.key.split(":")[1]] || D.boe && D.boe.series[s.key.split(":")[1]] || {}).unit) || "") : false;
+      const txt = useDiff ? ((last - first) * 100 > 0 ? "+" : "") + fmt((last - first) * 100, 0) + " bp" : s.key.startsWith("cot:") ? ((last - first) > 0 ? "+" : "") + fmt(last - first, 0) : (pct > 0 ? "+" : "") + fmt(pct, 2) + "%";
+      it.append(chgNode(useDiff ? last - first : s.key.startsWith("cot:") ? last - first : pct, txt));
+    }
+    if (s !== pri) {
+      const a = [], b = [];
+      pri.pts.forEach(p => { const v = valueOn(s.pts, p[0]); if (v != null && p[1] != null) { a.push(p[1]); b.push(v); } });
+      const r = corr(a, b);
+      it.append(el("span", "r", r == null ? "r —" : "r " + (r > 0 ? "+" : "") + fmt(r, 2) + " vs " + pri.c.short));
+      const mk = el("button", "", "make primary"); mk.type = "button"; mk.onclick = () => { OV.primary = s.key; ovSave(); drawOverlay(); }; it.append(mk);
+    }
+    const rm = el("button", "", "×"); rm.type = "button"; rm.title = "Remove " + s.c.name; rm.setAttribute("aria-label", "Remove " + s.c.name);
+    rm.onclick = () => { OV.series = OV.series.filter(k => k !== s.key); ovSave(); drawOverlay(); }; it.append(rm);
+    $("ovLegend").append(it);
+  });
+}
+function drawOvEvents() {
+  const ul = $("ovEventList"); ul.replaceChildren();
+  OV.events.slice().sort((a, b) => a.date < b.date ? -1 : 1).forEach(e => {
+    const li = el("li"); li.append(el("span", "", e.date), el("span", "", e.label));
+    const b = el("button", "", "Remove"); b.type = "button"; b.onclick = () => { OV.events = OV.events.filter(x => x !== e); ovSave(); drawOverlay(); };
+    li.append(b); ul.append(li);
+  });
+}
+$("ovEventForm").onsubmit = ev => {
+  ev.preventDefault();
+  const d = $("ovEventDate").value, l = $("ovEventLabel").value.trim();
+  if (!d || !l) return;
+  OV.events.push({ date: d, label: l.slice(0, 40) }); ovSave();
+  $("ovEventLabel").value = ""; drawOverlay();
+};
 
 // ---------- loading
 async function getJSON(name) {
@@ -667,6 +972,7 @@ async function load() {
   renderAll();
 }
 let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderAll, 150); });
+showTab(activeTab);
 load();
 setInterval(load, 2 * 60 * 1000);
 })();
