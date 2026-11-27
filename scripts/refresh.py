@@ -192,7 +192,6 @@ RESEARCH_FEEDS = [
     ("WSJ Economy", "https://feeds.content.dowjones.io/public/rss/socialeconomyfeed", None),
     ("Fed Beige Book", "https://www.federalreserve.gov/feeds/press_all.xml", "beige book"),
     ("CaixaBank Research", "https://www.caixabankresearch.com/en/rss.xml", None),   # daily markets report
-    ("Deutsche Bank Research", "https://www.dbresearch.com/PROD/IE-PROD/RSS_GROUP_HOME_EN.calias", None),
 ]
 # Leave out items whose link contains this (CaixaBank also publishes Spanish regional profiles).
 RESEARCH_SKIP_LINKS = {"CaixaBank Research": "autonomous-community"}
@@ -1020,8 +1019,9 @@ def fetch_research():
                     continue
                 if not link.startswith("https://"):   # podcasts often have no page per episode
                     link = channel_link
-                when = parse_date(text_of(e, "pubDate", f"{atom}updated", f"{atom}published",
-                                          "{http://purl.org/dc/elements/1.1/}date"))
+                raw = text_of(e, "pubDate", f"{atom}updated", f"{atom}published", "{http://purl.org/dc/elements/1.1/}date")
+                m = re.search(r'datetime="([^"]+)"', raw)   # Nordea wraps its date in an HTML <time> tag
+                when = parse_date(m.group(1) if m else raw)
                 summary = plain_text(text_of(e, "description", f"{atom}summary", f"{atom}content"))
                 if title and link.startswith("https://"):
                     fresh.append({"source": source, "title": title, "link": link, "published": when,
