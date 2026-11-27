@@ -17,6 +17,8 @@ A personal markets dashboard (rates, FX, equities, commodities, economic data an
 | Futures positioning (COT): speculators' net long minus short, 21 markets, 10 years weekly | CFTC public reporting API (no key) | quick check every 10 min; new report each Friday |
 | UK Bank Rate, SONIA, gilt yields, sterling | Bank of England database (no key) | every 30 min |
 | This week's economic calendar (forecast, previous) | Forex Factory public feed (no key) | every 30 min |
+| Fed meeting odds (cut / hold / hike) and expected rate path | Kalshi public market data (no key) + Fed target range from FRED | every 30 min |
+| Bank of England expected Bank Rate path | Bank of England SONIA forward curve (no key) | every 30 min (published daily) |
 | Big-company earnings dates | Finnhub (`FINNHUB_API_KEY` secret) | hourly |
 | Later US release dates | FRED | hourly |
 | Fundamentals: GDP, inflation, jobs, wages, retail sales, confidence surveys, trade, policy rates and 10-year yields for USD, EUR, GBP, JPY, CHF, CAD, AUD and NZD since 2000 | FRED, ONS (via DBnomics), ECB, Statistics Bureau of Japan (via DBnomics), SNB, Statistics Canada, RBA, OECD and BIS; only FRED needs a key (see `scripts/fundamentals.py`) | every 6 hours |
@@ -43,3 +45,4 @@ Actions tab → **Refresh market data** → **Run workflow**. A manual run fetch
 
 - GitHub can start scheduled runs late or skip some when it's busy, and pauses schedules in a repository with no activity for 60 days. The data commits count as activity, so this shouldn't happen while it's working.
 - If a source fails, the page shows a yellow note at the top and keeps the last good numbers.
+- Central bank pricing uses each bank's published meeting dates, typed into `FOMC_DATES` and `MPC_DATES` in `scripts/refresh.py`. Add the next year's dates once the Fed and the Bank of England publish them (usually mid-year and September).

@@ -103,6 +103,8 @@ details.tbl table{margin-top:6px;max-width:360px}
 .note{color:var(--faint);font-size:12px;margin:0 0 8px;line-height:1.5}
 .sub-h{font-size:12px;font-weight:600;color:var(--muted);margin:4px 0 4px}
 .sub-h:not(:first-child){margin-top:14px}
+.chart.pol-chart{height:160px;margin:2px 0 4px}
+.pol-odds{color:var(--muted)}
 .cal-row{border-bottom:1px solid var(--grid)}
 .cal-row.hi .nm{font-weight:600}
 .upd{font-size:11.5px;color:var(--faint);margin:-4px 0 8px}
@@ -283,6 +285,12 @@ th .hq{margin-left:3px}
       </section>
 
       <section class="panel">
+        <h2 data-help="policy">Central bank pricing <span>next 12 months</span></h2>
+        <div class="upd" data-src="policy"></div>
+        <div id="policy"></div>
+      </section>
+
+      <section class="panel">
         <h2 data-help="cal">Coming up <span id="calAsOf"></span></h2>
         <div class="upd" data-src="forexfactory,calendar"></div>
         <div id="calendar"></div>
@@ -349,7 +357,7 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 const SVGNS = "http://www.w3.org/2000/svg";
 const sv = (tag, attrs) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); return e; };
 
-let D = { prices: null, hist: null, fred: null, cot: null, boe: null, cal: null, ff: null, status: null, fund: null };
+let D = { prices: null, hist: null, fred: null, cot: null, boe: null, cal: null, ff: null, status: null, fund: null, policy: null };
 
 // ---------- "?" help buttons: hover on a computer, tap or click on a phone
 const HELP = {
@@ -366,6 +374,13 @@ const HELP = {
   curve: "The interest rate the US government pays to borrow for different lengths of time, from 3 months to 30 years. Normally longer loans pay more; when short rates are above long rates the curve is 'inverted', which has often come before recessions.",
   rates: "US interest rates, credit spreads and key market gauges from FRED. 'Chg' is the change from the day before.",
   uk: "UK interest rates and the pound, from the Bank of England's own database. It is usually one working day behind.",
+  policy: "What markets expect the central bank to do at each meeting over the next year. The line shows the expected policy rate after each meeting. This is what is 'priced in', not a forecast, and it moves as news comes out. Only the Fed and the Bank of England have free data we're allowed to use.",
+  polFed: "From Kalshi, a regulated US prediction market where people trade on the outcome of each Fed meeting. A price of 70 cents on 'hike' means a 70% chance. It is checked every 30 minutes.",
+  polBoe: "Worked out from the Bank of England's own SONIA forward curve, which shows where markets expect the overnight rate to be on each future day. It is published once a day, so it is usually one working day behind.",
+  "Exp. rate": "The policy rate markets expect after this meeting. For the Fed it is the middle of the target range.",
+  "vs now": "How far the expected rate is from today's rate, in basis points (bp). 25 bp is one standard move. Positive means hikes are priced, negative means cuts.",
+  "Cut / Hold / Hike": "The market's odds for this meeting's decision, in percent.",
+  Odds: "The rough chance of a 25 bp move at this meeting, worked out from how much the expected rate changes at the meeting. 50% means half a move is priced.",
   cal: "Economic data releases and big company results coming up, so you know what could move markets. Times are UK time.",
   ff: "This week's economic releases from Forex Factory. HIGH marks the ones that usually move markets most, such as jobs reports, inflation and central bank decisions.",
   earn: "When big US companies report their quarterly results. EPS est. is what analysts expect the company to earn per share.",
@@ -636,9 +651,9 @@ const ukTime = iso => {
   return day === today ? t : day + " " + t;
 };
 const SRC_LABEL = { prices_fx: "FX, gold & bitcoin", prices_us: "ETFs", fred: "FRED", boe: "Bank of England", cot: "CFTC",
-  calendar: "earnings & US dates", forexfactory: "Forex Factory", price_history: "price history", fundamentals: "economic data" };
+  calendar: "earnings & US dates", forexfactory: "Forex Factory", price_history: "price history", fundamentals: "economic data", policy: "central bank pricing" };
 const SRC_EVERY = { prices_fx: "every 20 min on weekdays", prices_us: "every 20 min in US market hours", fred: "every 30 min", boe: "every 30 min",
-  cot: "every 10 min (new report weekly)", calendar: "hourly", forexfactory: "every 30 min", price_history: "daily", fundamentals: "every 6 hours" };
+  cot: "every 10 min (new report weekly)", calendar: "hourly", forexfactory: "every 30 min", price_history: "daily", fundamentals: "every 6 hours", policy: "every 30 min" };
 function stampNode(srcs) {
   const st = D.status && D.status.sources || {};
   const box = el("div", "upd");
@@ -815,7 +830,7 @@ function lineChart(box, series, opt) {
   const show = i => {
     cur = i = Math.max(0, Math.min(n - 1, i));
     const x = X(i); xh.setAttribute("x1", x); xh.setAttribute("x2", x); xh.setAttribute("visibility", "visible");
-    const rows = [el("div", "k", opt.xLabels === "date" ? new Date(series[0].pts[i][0] + "T00:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : opt.xLabels[i])];
+    const rows = [el("div", "k", opt.xLabels === "date" ? new Date(series[0].pts[i][0] + "T00:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : (opt.tipLabels || opt.xLabels)[i])];
     series.forEach((s, j) => {
       const v = s.pts[i] && s.pts[i][1];
       if (v == null) { dots[j].setAttribute("visibility", "hidden"); return; }
@@ -981,6 +996,41 @@ function drawCalendar() {
   w.append(t);
 }
 
+// ---------- central bank pricing (Fed from Kalshi, BoE from its SONIA curve)
+function drawPolicy() {
+  const w = $("policy"); if (!w) return; w.replaceChildren();
+  const P = D.policy;
+  if (!P || !P.banks || !P.banks.length) { w.append(el("div", "empty", "Waiting for the first central bank pricing refresh.")); return; }
+  const mLabel = (m, long) => {
+    const d = new Date(m.date + "T12:00:00Z");
+    if (!m.exact) return d.toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" }) + (long ? " (date tbc)" : "");
+    return d.toLocaleDateString("en-GB", long ? { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" } : { day: "numeric", month: "short", timeZone: "UTC" });
+  };
+  const bp = v => (v > 0 ? "+" : "") + fmt(v, 0) + " bp";
+  const order = { fed: 0, boe: 1 };
+  P.banks.slice().sort((a, b) => (order[a.id] ?? 9) - (order[b.id] ?? 9)).forEach(b => {
+    const ms = b.meetings || []; if (!ms.length) return;
+    const h = el("div", "sub-h", b.name + " · " + b.rate_name + " " + b.rate_label);
+    h.append(hq(HELP[b.id === "fed" ? "polFed" : "polBoe"], b.name)); w.append(h);
+    const last = ms.at(-1);
+    w.append(el("p", "note", "By " + mLabel(last, true) + ": " + (Math.abs(last.change_bp) < 3 ? "no change priced" : bp(last.change_bp) + " priced (about " + fmt(Math.abs(last.change_bp) / 25, 1) + " " + (last.change_bp > 0 ? "hikes" : "cuts") + ")") + ". Source: " + b.source + (b.method === "curve" ? ", curve of " + mLabel({ date: b.as_of, exact: true }, true) : "") + "."));
+    const box = el("div", "chart pol-chart"); box.tabIndex = 0; box.setAttribute("aria-label", b.name + " expected rate path"); w.append(box);
+    const labels = ["Now"].concat(ms.map(m => mLabel(m)));
+    lineChart(box, [{ name: b.name, color: "var(--s1)", pts: [["Now", b.rate]].concat(ms.map(m => [mLabel(m), m.implied])) }],
+      { xLabels: labels.map((l, i) => ms.length > 6 && i % 2 && i < labels.length - 1 ? "" : l), tipLabels: labels, dots: true, fmtY: v => fmt(v, 2) + "%", fmtTick: v => v.toFixed(2) + "%" });
+    const t = el("table"); t.append(headRow(["", "Exp. rate", "vs now", b.method === "odds" ? "Cut / Hold / Hike" : "Odds"]));
+    ms.forEach(m => {
+      const r = el("tr");
+      r.append(el("td", "nm", mLabel(m, true)), el("td", "num", fmt(m.implied, 2) + "%"));
+      const c = el("td"); c.append(chgNode(Math.abs(m.change_bp) < 0.5 ? 0 : m.change_bp, bp(m.change_bp))); r.append(c);
+      if (b.method === "odds") r.append(el("td", "num pol-odds", [m.p_cut, m.p_hold, m.p_hike].map(v => fmt(v, 0)).join(" / ")));
+      else r.append(el("td", "num pol-odds", m.p_move < 5 ? "hold" : fmt(m.p_move, 0) + "% " + m.dir));
+      t.append(r);
+    });
+    w.append(t);
+  });
+}
+
 // ---------- yield curve
 function drawCurve() {
   const box = $("curveChart"); box.replaceChildren(); $("curveLegend").replaceChildren();
@@ -1044,7 +1094,7 @@ function drawHeader() {
            document.createTextNode(run ? " (" + relTime(run) + ")" : ""));
   const stale = run && Date.now() - new Date(run) > 75 * 60000;
   const errs = [];
-  [["Twelve Data prices", D.prices], ["Twelve Data history", D.hist], ["FRED", D.fred], ["Bank of England", D.boe]].forEach(([n, d]) => (d && d.errors || []).forEach(e => errs.push(n + ": " + e)));
+  [["Twelve Data prices", D.prices], ["Twelve Data history", D.hist], ["FRED", D.fred], ["Bank of England", D.boe], ["Central bank pricing", D.policy]].forEach(([n, d]) => (d && d.errors || []).forEach(e => errs.push(n + ": " + e)));
   const bad = (D.prices && D.prices.quotes || []).filter(q => q.error).map(q => q.symbol);
   if (bad.length) errs.push("Some symbols could not be refreshed: " + bad.join(", "));
   const b = $("banner"); b.replaceChildren();
@@ -1068,7 +1118,7 @@ function renderAll() {
   hideTip();
   if (activeTab === "overlays") { drawHeader(); drawOverlay(); return; }
   if (activeTab === "fund") { drawHeader(); drawFund(); drawStamps(); return; }
-  drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawCot(); drawRates(); drawUK(); drawCalendar(); drawStamps(); drawCurve(); drawEcon();
+  drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawCot(); drawRates(); drawUK(); drawPolicy(); drawCalendar(); drawStamps(); drawCurve(); drawEcon();
 }
 
 // ---------- tabs
@@ -1477,9 +1527,9 @@ async function getJSON(name) {
 }
 let fundAt = 0, fundSeen = null;
 async function load() {
-  const names = ["prices", "price_history", "fred", "cot", "boe", "calendar", "ff", "status"];
+  const names = ["prices", "price_history", "fred", "cot", "boe", "calendar", "ff", "status", "policy"];
   const got = await Promise.all(names.map(n => getJSON(n + ".json")));
-  const keys = ["prices", "hist", "fred", "cot", "boe", "cal", "ff", "status"];
+  const keys = ["prices", "hist", "fred", "cot", "boe", "cal", "ff", "status", "policy"];
   const next = {}; keys.forEach((k, i) => next[k] = got[i] || D[k]);
   // economic data is larger and changes a few times a day: re-read it every 30 minutes, or when its source changed
   const fst = next.status && next.status.sources && next.status.sources.fundamentals;

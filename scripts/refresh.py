@@ -11,6 +11,8 @@ Sources
   Finnhub      earnings dates
   CFTC         Commitments of Traders futures positioning (no key needed)
   Forex Factory  this week's economic calendar (no key needed)
+  Kalshi       market odds for each Fed meeting (no key needed)
+  BoE curve    SONIA forward curve, turned into an expected Bank Rate path
   Fundamentals  economic indicators for the eight major currencies from FRED, ONS,
                 ECB, OECD, BIS, Statistics Canada, RBA, SNB and Japan's Statistics
                 Bureau (see scripts/fundamentals.py; only FRED needs a key)
@@ -77,6 +79,7 @@ SCHEDULE = {
     "cot": 10,            # quick "is there a new report?" check
     "calendar": 60,       # earnings dates + US release dates
     "forexfactory": 30,   # Forex Factory asks people not to poll it often
+    "policy": 30,         # Fed odds (Kalshi) and the BoE's SONIA curve (daily)
     "fundamentals": 360,  # official economic statistics (scripts/fundamentals.py), ~55 requests
 }
 US_SESSION_UTC = (13 * 60 + 30, 21 * 60 + 15)   # minutes after midnight UTC (covers summer and winter time)
@@ -499,6 +502,303 @@ def fetch_boe():
     return save("boe.json", {"updated": iso(now_utc()), "errors": [], "series": series})
 
 
+# ---------------------------------------------------------------- central bank pricing
+#
+# What markets expect the Fed and the Bank of England to do at each meeting in
+# the next 12 months. Only these two have free data we're allowed to use:
+#   Fed  Kalshi, a regulated US prediction market with a free public data feed
+#        (no key). It prices cut / hold / hike for each FOMC meeting.
+#   BoE  the Bank of England's own daily SONIA (overnight swap) forward curve,
+#        published free as a spreadsheet. We turn it into a Bank Rate path.
+# Meeting dates come from each bank's published calendar. UPDATE THESE LISTS
+# once a year when the banks publish the next year's dates.
+
+FOMC_DATES = [  # federalreserve.gov/monetarypolicy/fomccalendars.htm (decision day)
+    "2026-12-09", "2027-01-27", "2027-03-17", "2027-04-28", "2027-06-09",
+    "2027-07-28", "2027-09-15", "2027-10-27", "2027-11-17", "2028-01-26",
+]
+MPC_DATES = [  # bankofengland.co.uk "Monetary Policy Committee dates for 2027"
+    "2026-12-17", "2027-02-04", "2027-03-18", "2027-04-29", "2027-06-17",
+    "2027-07-29", "2027-09-16", "2027-11-04", "2027-12-16",
+]
+KALSHI_URLS = ["https://api.elections.kalshi.com/trade-api/v2", "https://external-api.kalshi.com/trade-api/v2"]
+KALSHI_FED_SERIES = "KXFEDDECISION"
+BOE_CURVE_URL = "https://www.bankofengland.co.uk/-/media/boe/files/statistics/yield-curves/latest-yield-curve-data.zip"
+POLICY_MONTHS = 12
+MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+
+
+def kalshi_move_bp(suffix):
+    """Market ticker ending -> size of move in bp: C25 = cut 25, H0 = hold, H26 / C25P = more than 25."""
+    s = suffix.upper()
+    if s == "HOLD":
+        return 0
+    if not s or s[0] not in "CH":
+        return None
+    sign = -1 if s[0] == "C" else 1
+    digits = "".join(ch for ch in s[1:] if ch.isdigit())
+    if not digits:
+        return None
+    n = int(digits)
+    if n == 0:
+        return 0
+    return sign * (50 if n > 25 or s.endswith("P") else 25)
+
+
+def kalshi_price(m):
+    """Best guess of a market's probability (0-1): middle of bid and ask, else last trade."""
+    bid, ask, last = num(m.get("yes_bid_dollars")), num(m.get("yes_ask_dollars")), num(m.get("last_price_dollars"))
+    if bid is None and m.get("yes_bid") is not None:      # older field names, in cents
+        bid, ask, last = (num(m.get(k)) / 100 if num(m.get(k)) is not None else None for k in ("yes_bid", "yes_ask", "last_price"))
+    if bid is not None and ask is not None and ask > 0 and ask - bid <= 0.10:
+        return (bid + ask) / 2
+    if last is not None and last > 0:
+        return last
+    if bid is not None and ask is not None and ask > 0:
+        return (bid + ask) / 2
+    return 0.0
+
+
+def kalshi_meeting_date(event_ticker, dates):
+    """KXFEDDECISION-27MAR -> the FOMC date in March 2027, or the 1st of the month if the calendar has none."""
+    code = event_ticker.rsplit("-", 1)[-1]
+    try:
+        year, month = 2000 + int(code[:2]), MONTHS.index(code[2:5]) + 1
+    except (ValueError, IndexError):
+        return None, False
+    for d in dates:
+        if d.startswith(f"{year:04d}-{month:02d}"):
+            return d, True
+    return f"{year:04d}-{month:02d}-01", False
+
+
+def fred_latest(sid, key):
+    q = {"series_id": sid, "api_key": key, "file_type": "json", "sort_order": "desc", "limit": 10}
+    obs = get_json("https://api.stlouisfed.org/fred/series/observations?" + urllib.parse.urlencode(q))["observations"]
+    for o in obs:
+        if o["value"] not in (".", ""):
+            return o["date"], float(o["value"])
+    raise RuntimeError(f"no recent value for {sid}")
+
+
+def fed_path(fred_key):
+    if not fred_key:
+        raise RuntimeError("FRED_API_KEY is needed for the Fed's current target range")
+    d_hi, hi = fred_latest("DFEDTARU", fred_key)
+    _, lo = fred_latest("DFEDTARL", fred_key)
+    data, err = None, None
+    for base in KALSHI_URLS:
+        url = f"{base}/events?" + urllib.parse.urlencode(
+            {"series_ticker": KALSHI_FED_SERIES, "status": "open", "with_nested_markets": "true", "limit": 50})
+        try:
+            data = get_json(url)
+            break
+        except Exception as e:  # noqa: BLE001
+            err = e
+    if data is None:
+        raise RuntimeError(f"Kalshi: {err}")
+    today = now_utc().date().isoformat()
+    horizon = (now_utc().date() + dt.timedelta(days=POLICY_MONTHS * 31)).isoformat()
+    meetings = []
+    for ev in data.get("events", []):
+        date, exact = kalshi_meeting_date(ev.get("event_ticker", ""), FOMC_DATES)
+        if not date or date < today[:8] + "01" or date > horizon:
+            continue
+        probs = {}
+        for m in ev.get("markets", []):
+            mv = kalshi_move_bp(m.get("ticker", "").rsplit("-", 1)[-1])
+            if mv is not None:
+                probs[mv] = probs.get(mv, 0) + kalshi_price(m)
+        total = sum(probs.values())
+        if total <= 0:
+            continue
+        probs = {k: v / total for k, v in probs.items()}
+        meetings.append({
+            "date": date, "exact": exact,
+            "p_cut": round(sum(v for k, v in probs.items() if k < 0) * 100, 1),
+            "p_hold": round(probs.get(0, 0) * 100, 1),
+            "p_hike": round(sum(v for k, v in probs.items() if k > 0) * 100, 1),
+            "move_bp": round(sum(k * v for k, v in probs.items()), 1),
+        })
+    meetings.sort(key=lambda x: x["date"])
+    if not meetings:
+        raise RuntimeError("Kalshi returned no Fed meetings")
+    rate = (hi + lo) / 2
+    cum = 0.0
+    for m in meetings:
+        cum += m["move_bp"]
+        m["change_bp"] = round(cum, 1)
+        m["implied"] = round(rate + cum / 100, 3)
+    print(f"  Fed: {len(meetings)} meetings")
+    return {"id": "fed", "name": "Federal Reserve", "rate": rate, "rate_label": f"{lo:.2f}–{hi:.2f}%",
+            "rate_name": "Fed funds target range (midpoint used)", "rate_date": d_hi,
+            "source": "Kalshi prediction market", "source_url": "https://kalshi.com/markets/kxfeddecision",
+            "method": "odds", "as_of": iso(now_utc()), "meetings": meetings}
+
+
+# --- a tiny .xlsx reader (an .xlsx file is a zip of XML files), so no extra packages are needed
+
+def xlsx_sheets(blob):
+    import io
+    import re
+    import zipfile
+    import xml.etree.ElementTree as ET
+    ns = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+          "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+          "p": "http://schemas.openxmlformats.org/package/2006/relationships"}
+    z = zipfile.ZipFile(io.BytesIO(blob))
+    strings = []
+    if "xl/sharedStrings.xml" in z.namelist():
+        for si in ET.fromstring(z.read("xl/sharedStrings.xml")).findall("m:si", ns):
+            strings.append("".join(t.text or "" for t in si.iter(f"{{{ns['m']}}}t")))
+    rels = {r.get("Id"): r.get("Target") for r in ET.fromstring(z.read("xl/_rels/workbook.xml.rels")).findall("p:Relationship", ns)}
+    out = {}
+    for sh in ET.fromstring(z.read("xl/workbook.xml")).find("m:sheets", ns).findall("m:sheet", ns):
+        target = rels.get(sh.get(f"{{{ns['r']}}}id"), "")
+        path = target.lstrip("/") if target.startswith("/") else "xl/" + target
+        if path not in z.namelist():
+            continue
+        out[sh.get("name")] = (z, path, strings, ns)
+    return out
+
+
+def xlsx_rows(entry):
+    import re
+    import xml.etree.ElementTree as ET
+    z, path, strings, ns = entry
+    rows = []
+    for row in ET.fromstring(z.read(path)).iter(f"{{{ns['m']}}}row"):
+        cells = {}
+        for c in row.findall("m:c", ns):
+            col = 0
+            for ch in re.match(r"[A-Z]+", c.get("r", "A")).group(0):
+                col = col * 26 + ord(ch) - 64
+            v = c.find("m:v", ns)
+            t = c.get("t")
+            if t == "inlineStr":
+                val = "".join(x.text or "" for x in c.iter(f"{{{ns['m']}}}t"))
+            elif v is None or v.text is None:
+                continue
+            elif t == "s":
+                val = strings[int(v.text)]
+            elif t in ("str", "e", "b"):
+                val = v.text
+            else:
+                val = num(v.text)
+            cells[col - 1] = val
+        rows.append(cells)
+    return rows
+
+
+def boe_forward_curve(blob):
+    """From the Bank's yield-curve zip: (curve date, [(months ahead, forward rate %)]) for the
+    latest day of the SONIA (OIS) short-end forward curve."""
+    import io
+    import zipfile
+    outer = zipfile.ZipFile(io.BytesIO(blob))
+    names = [n for n in outer.namelist() if n.lower().endswith(".xlsx") and "ois" in n.lower()]
+    names.sort(key=lambda n: (" daily" not in n.lower(), "current" not in n.lower(), n))
+    if not names:
+        raise RuntimeError("no OIS spreadsheet in the Bank's zip file")
+    sheets = xlsx_sheets(outer.read(names[0]))
+    pick = [s for s in sheets if "fwd" in s.lower() and "short" in s.lower()] or [s for s in sheets if "fwd" in s.lower()]
+    if not pick:
+        raise RuntimeError(f"no forward-curve sheet in {names[0]} (sheets: {', '.join(sheets)})")
+    rows = xlsx_rows(sheets[pick[0]])
+
+    def is_date(v):
+        return isinstance(v, float) and 30000 < v < 80000
+
+    header, data = None, []
+    for cells in rows:
+        if is_date(cells.get(0)):
+            vals = {k: v for k, v in cells.items() if k > 0 and isinstance(v, float)}
+            if header and len(vals) >= 3:
+                data.append((cells[0], vals))
+            continue
+        mats = {k: v for k, v in cells.items() if k > 0 and isinstance(v, float)}
+        if len(mats) >= 6:
+            seq = [mats[k] for k in sorted(mats)]
+            if all(b > a for a, b in zip(seq, seq[1:])) and seq[0] >= 0:
+                header = mats
+    if not header or not data:
+        raise RuntimeError("couldn't find the curve's maturities and values in the spreadsheet")
+    seq = [header[k] for k in sorted(header)]
+    in_years = max(seq) <= 10 and any(abs(v - round(v)) > 1e-6 for v in seq)
+    serial, vals = data[-1]
+    curve = sorted(((header[k] * 12 if in_years else header[k]), v) for k, v in vals.items() if k in header)
+    day = (dt.date(1899, 12, 30) + dt.timedelta(days=int(serial))).isoformat()
+    return day, curve
+
+
+def forward_at(curve, months):
+    if months <= curve[0][0]:
+        return curve[0][1]
+    for (m0, f0), (m1, f1) in zip(curve, curve[1:]):
+        if months <= m1:
+            return f0 + (f1 - f0) * (months - m0) / (m1 - m0)
+    return curve[-1][1]
+
+
+def boe_path():
+    req = urllib.request.Request(BOE_CURVE_URL, headers={"User-Agent": BROWSER_UA})
+    with urllib.request.urlopen(req, timeout=90) as r:
+        blob = r.read()
+    if not blob.startswith(b"PK"):
+        raise RuntimeError("the Bank returned a web page instead of the zip file")
+    curve_day, curve = boe_forward_curve(blob)
+    boe = (load("boe.json") or {}).get("series", {})
+    try:
+        rate_day, rate = boe["IUDBEDR"]["obs"][-1]
+    except (KeyError, IndexError):
+        raise RuntimeError("Bank Rate isn't in boe.json yet") from None
+    sonia = boe.get("IUDSOIA", {}).get("obs") or []
+    sonia_on = [v for d, v in sonia if d <= curve_day]
+    # SONIA sits a few bp under Bank Rate; add that gap back so the path is in Bank Rate terms.
+    basis = rate - sonia_on[-1] if sonia_on else 0.0
+    c0 = dt.date.fromisoformat(curve_day)
+    horizon = (now_utc().date() + dt.timedelta(days=POLICY_MONTHS * 31)).isoformat()
+    dates = [d for d in MPC_DATES if d > curve_day and d <= horizon]
+    meetings, prev = [], rate
+    for i, d in enumerate(dates):
+        start = dt.date.fromisoformat(d)    # a new Bank Rate applies from decision day
+        end = dt.date.fromisoformat(MPC_DATES[MPC_DATES.index(d) + 1]) if MPC_DATES.index(d) + 1 < len(MPC_DATES) \
+            else start + dt.timedelta(days=42)
+        days = max(1, (end - start).days)
+        avg = sum(forward_at(curve, ((start - c0).days + k + 0.5) / 30.4375) for k in range(days)) / days
+        implied = avg + basis
+        move = (implied - prev) * 100
+        meetings.append({"date": d, "exact": True, "implied": round(implied, 3),
+                         "change_bp": round((implied - rate) * 100, 1), "move_bp": round(move, 1),
+                         "p_move": round(min(abs(move) / 25, 1) * 100, 1), "dir": "hike" if move > 0 else "cut"})
+        prev = implied
+    if not meetings:
+        raise RuntimeError("no upcoming MPC dates in the list: add next year's dates to MPC_DATES")
+    print(f"  BoE: {len(meetings)} meetings, curve of {curve_day}")
+    return {"id": "boe", "name": "Bank of England", "rate": rate, "rate_label": f"{rate:.2f}%",
+            "rate_name": "Bank Rate", "rate_date": rate_day,
+            "source": "Bank of England SONIA forward curve", "source_url": "https://www.bankofengland.co.uk/statistics/yield-curves",
+            "method": "curve", "as_of": curve_day, "meetings": meetings}
+
+
+def fetch_policy(fred_key):
+    print("Central bank pricing")
+    old = {b["id"]: b for b in (load("policy.json") or {}).get("banks", [])}
+    banks, errors = [], []
+    for bid, fn, args in (("fed", fed_path, (fred_key,)), ("boe", boe_path, ())):
+        try:
+            banks.append(fn(*args))
+        except Exception as e:  # noqa: BLE001
+            msg = hide_key(str(e), fred_key)[:200]
+            print(f"  {bid} failed: {msg}")
+            errors.append(f"{bid.upper()}: {msg}")
+            if bid in old:
+                banks.append(old[bid])
+    if not banks:
+        raise RuntimeError("; ".join(errors))
+    return save("policy.json", {"updated": iso(now_utc()), "errors": errors, "banks": banks})
+
+
 # ---------------------------------------------------------------- Finnhub
 
 
@@ -671,6 +971,8 @@ def main():
         run_source("boe", fetch_boe)
     if due("cot", force):
         run_source("cot", fetch_cot)
+    if due("policy", force) or load("policy.json") is None:
+        run_source("policy", fetch_policy, fred_key)
     if due("forexfactory", force):
         run_source("forexfactory", fetch_forexfactory)
 
