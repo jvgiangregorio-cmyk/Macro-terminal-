@@ -105,10 +105,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          wait=$(( 570 - ($(date +%s) - STARTED) ))
-          if [ "$wait" -gt 0 ]; then sleep "$wait"; fi
-          waiting=$(gh run list -R "$GITHUB_REPOSITORY" -w refresh.yml -L 20 --json status \
-            --jq '[.[] | select(.status == "queued" or .status == "pending" or .status == "waiting" or .status == "requested")] | length')
+          count_waiting() {
+            gh run list -R "$GITHUB_REPOSITORY" -w refresh.yml -L 20 --json status \
+              --jq '[.[] | select(.status == "queued" or .status == "pending" or .status == "waiting" or .status == "requested")] | length' || echo 0
+          }
+          # Wait until about 9.5 minutes after this run started, but stop
+          # waiting as soon as another run is queued (for example after a
+          # merge), so that run starts and publishes the update straight away.
+          waiting=0
+          while [ $(( $(date +%s) - STARTED )) -lt 570 ]; do
+            waiting=$(count_waiting)
+            if [ "$waiting" != "0" ]; then break; fi
+            sleep 20
+          done
+          if [ "$waiting" = "0" ]; then waiting=$(count_waiting); fi
           if [ "$waiting" = "0" ]; then
             gh workflow run refresh.yml -R "$GITHUB_REPOSITORY" --ref main -f mode=chain
             echo "Queued the next refresh."
