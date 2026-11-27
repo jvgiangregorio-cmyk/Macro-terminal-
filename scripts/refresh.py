@@ -187,7 +187,6 @@ RESEARCH_FEEDS = [
     ("Goldman Sachs podcast", "https://feeds.megaphone.fm/GLD9322922848", None),
     ("Fed Beige Book", "https://www.federalreserve.gov/feeds/press_all.xml", "beige book"),
     ("FactSet Insight", "https://insight.factset.com/rss.xml", None),
-    ("Syz", "https://blog.syzgroup.com/rss.xml", None),
 ]
 RESEARCH_PER_SOURCE = 12
 RESEARCH_KEEP_DAYS = 120   # long enough to keep the last Beige Book (8 a year)
