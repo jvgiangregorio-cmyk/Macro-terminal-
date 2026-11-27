@@ -365,7 +365,10 @@ def fetch_price_history(key):
 
 
 def history_is_stale():
-    """Daily closes: download once every 20 hours."""
+    """Daily closes: download once every 20 hours, or straight away when a symbol is new."""
+    have = (load("price_history.json") or {}).get("series", {})
+    if any(sym not in have for sym, _, _ in TD_SYMBOLS):
+        return True
     last = STATUS.get("price_history", {}).get("checked") or (load("price_history.json") or {}).get("updated")
     if not last:
         return True
