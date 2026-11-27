@@ -114,8 +114,15 @@ details.tbl table{margin-top:6px;max-width:360px}
 .tag{display:inline-block;font:600 10px "IBM Plex Mono",monospace;padding:1px 5px;border-radius:4px;border:1px solid var(--line);color:var(--muted);margin-left:6px;vertical-align:1px}
 .tag.hi{border-color:var(--down);color:var(--down)}
 /* tabs */
-.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:-4px 0 14px}
-.tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:8px 14px;font:500 13px "IBM Plex Mono",monospace;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+#tab-home [hidden]{display:none!important}
+/* category tabs: show only that category's panels, flowing into two even columns */
+#tab-home:not([data-view="home"]) .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+#tab-home:not([data-view="home"]) .col{display:contents}
+#tab-home[data-view="cb"] .grid,#tab-home[data-view="research"] .grid{grid-template-columns:minmax(0,1fr)}
+#tab-home:not([data-view="home"]) .markets{grid-template-columns:minmax(0,1fr)}
+@media (max-width:1100px){#tab-home:not([data-view="home"]) .grid{grid-template-columns:minmax(0,1fr)}}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:-4px 0 14px;overflow-x:auto;scrollbar-width:thin}
+.tabs button{flex:none;white-space:nowrap;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:8px 11px;font:500 13px "IBM Plex Mono",monospace;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 .tabs button:hover{background:transparent;color:var(--text)}
 .tabs button[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent)}
 /* chart overlays */
@@ -242,6 +249,14 @@ th .hq{margin-left:3px}
   </header>
   <nav class="tabs" role="tablist" aria-label="Pages">
     <button type="button" role="tab" id="tabbtn-home" data-tab="home">Homepage</button>
+    <button type="button" role="tab" data-tab="fx">Currencies</button>
+    <button type="button" role="tab" data-tab="equities">Equities</button>
+    <button type="button" role="tab" data-tab="commodities">Commodities</button>
+    <button type="button" role="tab" data-tab="rates">Rates</button>
+    <button type="button" role="tab" data-tab="cb">Central banks</button>
+    <button type="button" role="tab" data-tab="positioning">Positioning</button>
+    <button type="button" role="tab" data-tab="economy">Economy</button>
+    <button type="button" role="tab" data-tab="research">Research</button>
     <button type="button" role="tab" id="tabbtn-fund" data-tab="fund">Fundamentals</button>
     <button type="button" role="tab" id="tabbtn-overlays" data-tab="overlays">Chart overlays</button>
   </nav>
@@ -251,7 +266,7 @@ th .hq{margin-left:3px}
 
   <div class="grid">
     <div class="col">
-      <section class="panel" aria-label="Selected chart">
+      <section class="panel" aria-label="Selected chart" data-cat="fx equities commodities rates positioning economy">
         <h2 data-help="chart">Chart <span>click any row or tile on the page</span></h2>
         <div class="main-head">
           <div class="main-title" id="mainTitle">—</div>
@@ -264,16 +279,16 @@ th .hq{margin-left:3px}
         <details class="tbl"><summary>Show recent values as a table</summary><div id="mainTable"></div></details>
       </section>
 
-      <div class="markets" id="markets"></div>
+      <div class="markets" id="markets" data-cat="fx equities commodities"></div>
 
-      <section class="panel">
+      <section class="panel" data-cat="positioning">
         <h2 data-help="cot">Futures positioning (CFTC COT) <span id="cotAsOf"></span></h2>
         <div class="upd" data-src="cot"></div>
         <p class="note">Speculators' net position in futures: contracts betting on a rise minus contracts betting on a fall. Positive means they lean long. "vs 3Y" shows where today sits between the lowest (left) and highest (right) net position of the last three years. Click a row for 10 years of history.</p>
         <table id="cot"></table>
       </section>
 
-      <section class="panel">
+      <section class="panel" data-cat="economy">
         <h2 data-help="econ">Economy <span>click a tile to chart it</span></h2>
         <div class="upd" data-src="fred"></div>
         <div class="tiles" id="econ"></div>
@@ -281,38 +296,38 @@ th .hq{margin-left:3px}
     </div>
 
     <div class="col">
-      <section class="panel">
+      <section class="panel" data-cat="rates">
         <h2 data-help="curve">US Treasury yield curve <span id="curveAsOf"></span></h2>
         <div class="upd" data-src="fred"></div>
         <div class="chart" id="curveChart" style="height:210px" tabindex="0" aria-label="Yield curve chart"></div>
         <div class="legend" id="curveLegend"></div>
       </section>
 
-      <section class="panel">
+      <section class="panel" data-cat="rates">
         <h2 data-help="rates">Rates &amp; credit <span>daily change</span></h2>
         <div class="upd" data-src="fred"></div>
         <table id="rates"></table>
       </section>
 
-      <section class="panel">
+      <section class="panel" data-cat="rates">
         <h2 data-help="uk">UK rates &amp; sterling <span>Bank of England</span></h2>
         <div class="upd" data-src="boe"></div>
         <table id="ukrates"></table>
       </section>
 
-      <section class="panel">
+      <section class="panel" data-cat="cb">
         <h2 data-help="policy">Central bank pricing <span>next 12 months</span></h2>
         <div class="upd" data-src="policy"></div>
         <div id="policy"></div>
       </section>
 
-      <section class="panel">
+      <section class="panel" data-cat="economy">
         <h2 data-help="cal">Coming up <span id="calAsOf"></span></h2>
         <div class="upd" data-src="forexfactory,calendar"></div>
         <div id="calendar"></div>
       </section>
 
-      <section class="panel">
+      <section class="panel" data-cat="research">
         <h2 data-help="research">Research <span>free public research · opens on the publisher's site</span></h2>
         <div class="upd" data-src="research"></div>
         <div class="chips" id="rchips"></div>
@@ -953,7 +968,7 @@ function drawMarkets() {
   const wrap = $("markets"); wrap.replaceChildren();
   const quotes = D.prices && D.prices.quotes || [];
   ["Equities", "FX", "Commodities"].forEach(g => {
-    const p = el("section", "panel"); const h = el("h2", "", g === "Commodities" ? "Commodities & crypto" : g === "FX" ? "Currencies" : "Equities (ETFs)"); h.append(hq(HELP[g], h.textContent)); p.append(h, stampNode(g === "Equities" ? "prices_us" : g === "FX" ? "prices_fx" : "prices_fx,prices_us"));
+    const p = el("section", "panel"); p.dataset.cat = { FX: "fx", Equities: "equities", Commodities: "commodities" }[g]; const h = el("h2", "", g === "Commodities" ? "Commodities & crypto" : g === "FX" ? "Currencies" : "Equities (ETFs)"); h.append(hq(HELP[g], h.textContent)); p.append(h, stampNode(g === "Equities" ? "prices_us" : g === "FX" ? "prices_fx" : "prices_fx,prices_us"));
     if (g === "FX") {
       const tg = el("div", "ov-group fx-toggle"); tg.setAttribute("role", "group"); tg.setAttribute("aria-label", "Which currency pairs");
       [["majors", "Dollar pairs"], ["crosses", "Crosses (" + (D.xq || []).length + ")"]].forEach(([k, lab]) => {
@@ -982,6 +997,7 @@ function drawMarkets() {
     });
     p.append(t); wrap.append(p);
   });
+  applyView();
 }
 
 // ---------- rates table
@@ -1213,21 +1229,48 @@ function renderAll() {
   hideTip();
   if (activeTab === "overlays") { drawHeader(); drawOverlay(); return; }
   if (activeTab === "fund") { drawHeader(); drawFund(); drawStamps(); return; }
+  fitSelection(); applyView();
   drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawCot(); drawRates(); drawUK(); drawPolicy(); drawCalendar(); drawStamps(); drawCurve(); drawEcon(); drawResearch();
 }
 
 // ---------- tabs
-const TAB_HASH = { overlays: "#overlays", fund: "#fundamentals" };
+// Category tabs (Currencies, Rates, ...) reuse the Homepage panels and just show the ones that belong to them.
+const TAB_HASH = { overlays: "#overlays", fund: "#fundamentals", fx: "#currencies", equities: "#equities", commodities: "#commodities",
+  rates: "#rates", cb: "#central-banks", positioning: "#positioning", economy: "#economy", research: "#research" };
+const ALL_TABS = ["home", "fund", "overlays", "fx", "equities", "commodities", "rates", "cb", "positioning", "economy", "research"];
 let activeTab = "home";
 try {
   const fromHash = Object.keys(TAB_HASH).find(k => TAB_HASH[k] === location.hash);
   activeTab = fromHash || localStorage.getItem("mt-tab") || "home";
-  if (!["home", "fund", "overlays"].includes(activeTab)) activeTab = "home";
+  if (!ALL_TABS.includes(activeTab)) activeTab = "home";
 } catch (e) {}
+function applyView() {
+  const box = $("tab-home"), v = activeTab; box.dataset.view = v;
+  box.querySelectorAll("[data-cat]").forEach(s => { s.hidden = v !== "home" && !s.dataset.cat.split(" ").includes(v); });
+}
+// On a category tab, make sure the big chart shows something from that category.
+function fitSelection() {
+  const v = activeTab, quotes = D.prices && D.prices.quotes || [];
+  const tdGroup = { fx: "FX", equities: "Equities", commodities: "Commodities" }[v];
+  if (tdGroup) {
+    const q = allQuotes().find(q => q.symbol === selected.id);
+    if (selected.kind === "td" && q && q.group === tdGroup) return;
+    const first = (tdGroup === "FX" && fxView === "crosses" ? (D.xq || []) : quotes.filter(q => q.group === tdGroup))[0];
+    if (first) selected = { kind: "td", id: first.symbol };
+  } else if (v === "rates") {
+    if (!(selected.kind === "fred" && (RATE_ROWS.includes(selected.id) || UK_ROWS.includes(selected.id)))) selected = { kind: "fred", id: "DGS10" };
+  } else if (v === "economy") {
+    if (!(selected.kind === "fred" && ECON.includes(selected.id))) { selected = { kind: "fred", id: ECON[0] }; if (RANGES[range] < 1000) range = "5Y"; }
+  } else if (v === "positioning") {
+    const ms = D.cot && D.cot.markets || [];
+    if (selected.kind !== "cot" && ms.length) { selected = { kind: "cot", id: ms[0].code }; if (RANGES[range] < 1000) range = "5Y"; }
+  }
+}
 function showTab(name) {
   activeTab = name;
   document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === name));
-  ["home", "fund", "overlays"].forEach(t => { $("tab-" + t).hidden = name !== t; });
+  $("tab-fund").hidden = name !== "fund"; $("tab-overlays").hidden = name !== "overlays";
+  $("tab-home").hidden = name === "fund" || name === "overlays";
   try { localStorage.setItem("mt-tab", name); history.replaceState(null, "", TAB_HASH[name] || location.pathname); } catch (e) {}
   hideTip(); closeSearch();
   if (name === "overlays") drawOverlay(); else renderAll();
