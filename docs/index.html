@@ -111,6 +111,16 @@ details.tbl table{margin-top:6px;max-width:360px}
 .cal-row.past{opacity:.5}
 .tag{display:inline-block;font:600 10px "IBM Plex Mono",monospace;padding:1px 5px;border-radius:4px;border:1px solid var(--line);color:var(--muted);margin-left:6px;vertical-align:1px}
 .tag.hi{border-color:var(--down);color:var(--down)}
+/* TradingView widgets */
+.tape{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:14px;min-height:46px;overflow:hidden}
+.tv-chart{height:560px}
+.tv-yields{height:330px}
+.tv-chart .tradingview-widget-container,.tv-yields .tradingview-widget-container{height:100%;width:100%}
+.tv-chart .tradingview-widget-container__widget,.tv-yields .tradingview-widget-container__widget{height:calc(100% - 32px);width:100%}
+.tradingview-widget-copyright{font-size:11px;color:var(--faint);line-height:32px}
+.tradingview-widget-copyright a{color:var(--faint)}
+.tape .tradingview-widget-copyright{display:none}
+@media (max-width:520px){.tv-chart{height:420px}}
 /* economy */
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .tile{border:1px solid var(--line);border-radius:8px;padding:10px;cursor:pointer;background:transparent;text-align:left}
@@ -143,11 +153,18 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
       <button id="themeBtn" type="button" title="Switch light or dark">◐ Theme</button>
     </div>
   </header>
+  <div class="tape" id="tvTape" aria-label="Live ticker tape"></div>
   <div id="banner"></div>
 
   <div class="grid">
     <div class="col">
+      <section class="panel" aria-label="Live chart">
+        <h2>Live chart <span>TradingView · type any symbol in the box, or click a price row below</span></h2>
+        <div class="tv-chart" id="tvChart"></div>
+      </section>
+
       <section class="panel" aria-label="Selected chart">
+        <h2>History chart <span>our stored data · click any row or tile on the page</span></h2>
         <div class="main-head">
           <div class="main-title" id="mainTitle">—</div>
           <div class="main-val" id="mainVal"></div>
@@ -176,6 +193,11 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
     </div>
 
     <div class="col">
+      <section class="panel">
+        <h2>Government bond yields <span>live · TradingView</span></h2>
+        <div class="tv-yields" id="tvYields"></div>
+      </section>
+
       <section class="panel">
         <h2>US Treasury yield curve <span id="curveAsOf"></span></h2>
         <div class="upd" data-src="fred"></div>
@@ -212,7 +234,7 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
 
   <footer>
     Prices: Twelve Data (currencies, gold and bitcoin every 20 minutes on weekdays; ETFs every 15 minutes in US market hours). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Futures positioning: CFTC Commitments of Traders, legacy futures-only report (released Fridays for the prior Tuesday). UK rates and sterling: Bank of England. Calendars and some headlines: Finnhub. Other headlines: publishers' RSS feeds.
-    The data refreshes on GitHub every 10 minutes (each source on its own timer, shown under each panel in UK time) and this page re-reads it every 2 minutes. Economic calendar: Forex Factory. Not investment advice.
+    The data refreshes on GitHub every 10 minutes (each source on its own timer, shown under each panel in UK time) and this page re-reads it every 2 minutes. Economic calendar: Forex Factory. Live chart, ticker tape and bond yields: TradingView widgets. Not investment advice.
   </footer>
 </div>
 
@@ -240,7 +262,70 @@ $("themeBtn").onclick = () => {
   document.documentElement.dataset.theme = next;
   try { localStorage.setItem("mt-theme", next); } catch (e) {}
   renderAll();
+  drawTV();
 };
+
+// ---------- TradingView widgets (free embeds; they load live data straight from TradingView)
+const TV_SYMBOL = {
+  "SPY": "AMEX:SPY", "QQQ": "NASDAQ:QQQ", "DIA": "AMEX:DIA", "IWM": "AMEX:IWM", "EFA": "AMEX:EFA", "EEM": "AMEX:EEM",
+  "EUR/USD": "FX:EURUSD", "USD/JPY": "FX:USDJPY", "GBP/USD": "FX:GBPUSD", "USD/CNY": "FX_IDC:USDCNY",
+  "AUD/USD": "FX:AUDUSD", "USD/CAD": "FX:USDCAD", "XAU/USD": "OANDA:XAUUSD", "SLV": "AMEX:SLV", "USO": "AMEX:USO",
+  "BTC/USD": "BITSTAMP:BTCUSD",
+};
+let tvSymbol = "FOREXCOM:SPXUSD";
+try { tvSymbol = localStorage.getItem("mt-tv-symbol") || tvSymbol; } catch (e) {}
+const tvTheme = () => (document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+function tvEmbed(container, name, config, credit) {
+  container.replaceChildren();
+  const wrap = el("div", "tradingview-widget-container");
+  const inner = el("div", "tradingview-widget-container__widget");
+  const cr = el("div", "tradingview-widget-copyright");
+  const a = el("a", "", credit || "Live data by TradingView"); a.href = "https://www.tradingview.com/"; a.target = "_blank"; a.rel = "noopener nofollow"; cr.append(a);
+  const sc = document.createElement("script");
+  sc.type = "text/javascript"; sc.async = true;
+  sc.src = "https://s3.tradingview.com/external-embedding/embed-widget-" + name + ".js";
+  sc.textContent = JSON.stringify(config);
+  wrap.append(inner, cr, sc);
+  container.append(wrap);
+}
+function drawTVChart() {
+  const dark = tvTheme() === "dark";
+  tvEmbed($("tvChart"), "advanced-chart", {
+    autosize: true, symbol: tvSymbol, interval: "D", timezone: "Europe/London", theme: tvTheme(), style: "1", locale: "en",
+    allow_symbol_change: true, calendar: false, hide_side_toolbar: false, save_image: false,
+    backgroundColor: dark ? "#191919" : "#ffffff", gridColor: dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
+    support_host: "https://www.tradingview.com",
+  });
+}
+function drawTV() {
+  const theme = tvTheme();
+  tvEmbed($("tvTape"), "ticker-tape", {
+    symbols: [
+      { proName: "FOREXCOM:SPXUSD", title: "S&P 500" }, { proName: "FOREXCOM:NSXUSD", title: "Nasdaq 100" },
+      { proName: "FOREXCOM:DJI", title: "Dow" }, { proName: "FOREXCOM:UKXGBP", title: "FTSE 100" },
+      { proName: "INDEX:DEU40", title: "DAX" }, { proName: "TVC:US10Y", title: "US 10Y" }, { proName: "TVC:GB10Y", title: "UK 10Y" },
+      { proName: "TVC:DXY", title: "Dollar index" }, { proName: "FX:EURUSD", title: "EUR/USD" }, { proName: "FX:GBPUSD", title: "GBP/USD" },
+      { proName: "FX:USDJPY", title: "USD/JPY" }, { proName: "OANDA:XAUUSD", title: "Gold" }, { proName: "TVC:USOIL", title: "WTI oil" },
+      { proName: "TVC:UKOIL", title: "Brent" }, { proName: "BITSTAMP:BTCUSD", title: "Bitcoin" },
+    ],
+    showSymbolLogo: false, isTransparent: true, displayMode: "adaptive", colorTheme: theme, locale: "en",
+  });
+  drawTVChart();
+  tvEmbed($("tvYields"), "market-quotes", {
+    width: "100%", height: "100%", showSymbolLogo: false, isTransparent: true, colorTheme: theme, locale: "en",
+    symbolsGroups: [{ name: "10-year and US curve", symbols: [
+      { name: "TVC:US02Y", displayName: "US 2-year" }, { name: "TVC:US10Y", displayName: "US 10-year" },
+      { name: "TVC:US30Y", displayName: "US 30-year" }, { name: "TVC:GB10Y", displayName: "UK 10-year gilt" },
+      { name: "TVC:DE10Y", displayName: "German 10-year Bund" }, { name: "TVC:JP10Y", displayName: "Japan 10-year JGB" },
+    ] }],
+  });
+}
+function setTVSymbol(sym) {
+  if (!sym || sym === tvSymbol) return;
+  tvSymbol = sym;
+  try { localStorage.setItem("mt-tv-symbol", sym); } catch (e) {}
+  drawTVChart();
+}
 
 // ---------- formatting
 const fmt = (v, d) => v == null || isNaN(v) ? "—" : v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -492,7 +577,7 @@ function drawMarkets() {
         const c2 = el("td"); c2.append(chgNode(q.pct, (q.pct > 0 ? "+" : "") + fmt(q.pct, 2) + "%")); if (q.error) { c2.append(el("span", "stale", " old")); c2.title = "Latest refresh failed: " + q.error; } r.append(c2);
         const c3 = el("td"); c3.append(spark((D.hist && D.hist.series[q.symbol] || []).slice(-252))); r.append(c3);
       }
-      const pick = () => { selected = { kind: "td", id: q.symbol }; renderAll(); };
+      const pick = () => { selected = { kind: "td", id: q.symbol }; setTVSymbol(TV_SYMBOL[q.symbol]); renderAll(); };
       r.onclick = pick; r.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
       t.append(r);
     });
@@ -703,6 +788,7 @@ async function load() {
 }
 let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderAll, 150); });
 load();
+drawTV();
 setInterval(load, 2 * 60 * 1000);
 })();
 </script>
