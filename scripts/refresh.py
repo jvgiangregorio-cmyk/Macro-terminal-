@@ -14,6 +14,8 @@ Sources
   Research     headlines from free public bank research feeds (no key needed)
   Kalshi       market odds for each Fed meeting (no key needed)
   BoE curve    SONIA forward curve, turned into an expected Bank Rate path
+  Scanner      unusual moves, trends, positioning extremes and correlation breaks,
+               worked out from the files above (scripts/scanner.py; no extra calls)
   Fundamentals  economic indicators for the eight major currencies from FRED, ONS,
                 ECB, OECD, BIS, Statistics Canada, RBA, SNB and Japan's Statistics
                 Bureau (see scripts/fundamentals.py; only FRED needs a key)
@@ -1097,6 +1099,13 @@ def main():
 
     if due("research", force) or load("research.json") is None:
         run_source("research", fetch_research)
+
+    # Scanner: rule-based checks worked out from the files above (no downloads, no API calls)
+    try:
+        import scanner
+        save("scanner.json", dict(updated=iso(now_utc()), **scanner.run()))
+    except Exception as e:  # noqa: BLE001
+        print(f"scanner failed: {e}")
 
     # Sources that were removed from the terminal: drop their old files and status.
     for gone in ("news", "finnhub_news"):

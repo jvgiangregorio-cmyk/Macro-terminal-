@@ -23,6 +23,7 @@ A personal markets dashboard (rates, FX, equities, commodities, economic data an
 | Later US release dates | FRED | hourly |
 | Research | Public research feeds: ING Think, Nordea, WSJ, Goldman Sachs podcast, Fed Beige Book, FactSet Insight (headlines and links only), plus a library of links to other banks' free research pages | hourly |
 | Fundamentals: GDP, inflation, jobs, wages, retail sales, confidence surveys, trade, policy rates and 10-year yields for USD, EUR, GBP, JPY, CHF, CAD, AUD and NZD since 2000 | FRED, ONS (via DBnomics), ECB, Statistics Bureau of Japan (via DBnomics), SNB, Statistics Canada, RBA, OECD and BIS; only FRED needs a key (see `scripts/fundamentals.py`) | every 6 hours |
+| Scanner tab: unusual moves vs normal volatility, 50/200-day average crosses, trend ranking (1w/1m/3m), stretched COT positioning, correlation map and broken relationships | worked out from the data above by `scripts/scanner.py` (no extra API calls) | every run |
 
 ## The API keys
 

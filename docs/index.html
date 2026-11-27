@@ -235,6 +235,31 @@ th .hq{margin-left:3px}
 .help-pop{position:fixed;display:none;z-index:20;max-width:min(300px,calc(100vw - 16px));background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 11px;font:12.5px/1.45 "IBM Plex Sans",system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.16);white-space:normal;text-align:left}
 .ov-legend-help{flex-basis:100%;color:var(--faint);font:12px "IBM Plex Sans",system-ui,sans-serif}
 @media (max-width:1100px){.grid{grid-template-columns:1fr}}
+/* scanner */
+.scan-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+.scan-wide{grid-column:1/-1}
+@media (max-width:1100px){.scan-grid{grid-template-columns:minmax(0,1fr)}}
+.scan-intro{max-width:900px}
+.scan-alerts{list-style:none;margin:0;padding:0;font-size:13px;line-height:1.45}
+.scan-alerts li{padding:6px 0;border-bottom:1px solid var(--grid);display:flex;gap:8px;align-items:baseline}
+.scan-alerts li:last-child{border-bottom:0}
+.scan-alerts li.click{cursor:pointer}.scan-alerts li.click:hover{background:var(--hover)}
+.scan-alerts .tag{flex:none;margin:0;min-width:72px;text-align:center}
+.scan-alerts .when{margin-left:auto;flex:none;color:var(--faint);font:11px "IBM Plex Mono",monospace}
+.zbar{display:inline-block;position:relative;width:56px;height:10px;vertical-align:middle}
+.zbar::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line)}
+.zbar i{position:absolute;top:2px;height:6px;border-radius:2px}
+.zbar i.up{background:var(--up)}.zbar i.down{background:var(--down)}
+td.hot{font-weight:600}
+.corr-wrap{overflow-x:auto}
+table.corr{width:auto;border-collapse:separate;border-spacing:2px}
+table.corr td,table.corr th{padding:0;width:38px;height:26px;text-align:center;font:11px "IBM Plex Mono",monospace;border:0}
+table.corr th{color:var(--muted);font-weight:500}
+table.corr th.rh{text-align:right;padding-right:6px;width:auto;white-space:nowrap}
+table.corr th.ch{height:auto;vertical-align:bottom;padding-bottom:4px}
+table.corr th.ch span{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap}
+table.corr td{border-radius:3px;color:var(--text)}
+table.corr td.dg{background:var(--grid)}
 @media (max-width:520px){.chart{height:240px}.ranges,.rg-wrap{margin-left:0}.hdr-right{margin-left:0}}
 </style>
 </head>
@@ -249,6 +274,7 @@ th .hq{margin-left:3px}
   </header>
   <nav class="tabs" role="tablist" aria-label="Pages">
     <button type="button" role="tab" id="tabbtn-home" data-tab="home">Homepage</button>
+    <button type="button" role="tab" id="tabbtn-scan" data-tab="scan">Scanner</button>
     <button type="button" role="tab" data-tab="fx">Currencies</button>
     <button type="button" role="tab" data-tab="equities">Equities</button>
     <button type="button" role="tab" data-tab="commodities">Commodities</button>
@@ -344,6 +370,42 @@ th .hq{margin-left:3px}
   </div>
   </div>
 
+  <div id="tab-scan" role="tabpanel" aria-labelledby="tabbtn-scan" hidden>
+    <p class="note scan-intro" id="scanIntro"></p>
+    <div class="scan-grid">
+      <section class="panel scan-wide">
+        <h2 data-help="scanAlerts">Alerts <span>what stands out right now · click one to chart it</span></h2>
+        <ul class="scan-alerts" id="scanAlerts"></ul>
+      </section>
+      <section class="panel">
+        <h2 data-help="scanMoves">Unusual moves <span>vs each market's normal day</span></h2>
+        <div class="ov-group fx-toggle" id="scanMovesToggle" role="group" aria-label="Which markets"></div>
+        <table id="scanMoves"></table>
+      </section>
+      <section class="panel">
+        <h2 data-help="scanTrend">Trend ranking <span>strongest up at the top</span></h2>
+        <div class="ov-group fx-toggle" id="scanTrendToggle" role="group" aria-label="Rank by"></div>
+        <table id="scanTrend"></table>
+      </section>
+      <section class="panel">
+        <h2 data-help="scanMA">Moving averages <span>50- and 200-day</span></h2>
+        <table id="scanMA"></table>
+      </section>
+      <section class="panel">
+        <h2 data-help="scanCot">Stretched positioning <span id="scanCotAsOf">CFTC COT</span></h2>
+        <table id="scanCot"></table>
+      </section>
+      <section class="panel scan-wide">
+        <h2 data-help="scanCorr">Markets moving together <span>correlation of daily moves</span></h2>
+        <div class="ov-group fx-toggle" id="scanCorrToggle" role="group" aria-label="Period"></div>
+        <div class="corr-wrap" id="scanCorr"></div>
+        <h3 class="sub-h" data-help="scanBreaks">Broken relationships</h3>
+        <ul class="scan-alerts" id="scanBreaks"></ul>
+      </section>
+    </div>
+    <p class="note" id="scanMissing"></p>
+  </div>
+
   <div id="tab-fund" role="tabpanel" aria-labelledby="tabbtn-fund" hidden>
     <div class="fund-tabs-row"><nav class="subtabs" id="fundTabs" role="tablist" aria-label="Currencies"></nav><span data-help="fundTabs"></span></div>
     <div class="fund-head">
@@ -401,10 +463,18 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 const SVGNS = "http://www.w3.org/2000/svg";
 const sv = (tag, attrs) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); return e; };
 
-let D = { prices: null, hist: null, fred: null, cot: null, boe: null, cal: null, ff: null, status: null, fund: null, policy: null, research: null };
+let D = { scan: null, prices: null, hist: null, fred: null, cot: null, boe: null, cal: null, ff: null, status: null, fund: null, policy: null, research: null };
 
 // ---------- "?" help buttons: hover on a computer, tap or click on a phone
 const HELP = {
+  // scanner
+  scanAlerts: "A short list of everything the scanner's rules flagged: unusually big moves, markets crossing their 200-day average, positioning at a 3-year extreme, and pairs of markets that stopped behaving the way they usually do. These are simple rules on the data already on this page, not predictions. Click an alert to chart that market.",
+  scanMoves: "How big each market's latest move was compared with its normal day. 'Size' divides the move by the typical daily move over the last 60 days (a z-score): 1 is an ordinary day, 2 or more is unusual (about 1 day in 20), 3 or more is rare. 'Week' does the same for the last 5 days. Prices are in %, yields and credit spreads in basis points (bp, hundredths of a percentage point).",
+  scanTrend: "Ranks every market by how strongly it has trended over 1 week, 1 month and 3 months. Each move is divided by what a normal move over that many days would be for that market, so a quiet market like EUR/USD and a jumpy one like bitcoin can be compared fairly. Above +1 is a clear uptrend, below −1 a clear downtrend. 'Score' is the average of the three (or the one period you picked).",
+  scanMA: "A moving average is the average price over the last 50 or 200 trading days. Many traders treat being above or below the 200-day average as a simple trend test. 'vs 200d' is how far the price is from it. 'Recent' shows a cross in the last 10 trading days, including a 'golden cross' (50-day average rising above the 200-day) and a 'death cross' (falling below).",
+  scanCot: "Where hedge funds' net futures position sits within its own 3-year range (the 'COT index'): 0 is the most short they have been in 3 years, 100 the most long. 90 or more, or 10 or less, is marked as stretched, because crowded positions can unwind sharply. Uses leveraged funds (managed money for commodities) where the CFTC reports them ('funds'), otherwise large speculators ('specs'). Updated weekly.",
+  scanCorr: "Correlation shows how often two markets move the same way on the same day, from +1 (always together) through 0 (no link) to −1 (always opposite). Blue cells move together, red cells move opposite. Switch between the last 3 months and the last year. Currencies close at midnight UK time and US ETFs at the New York close, so their daily links are slightly blurred. FRED series (yields, VIX, dollar index, HY spread) are usually a day behind.",
+  scanBreaks: "Pairs of markets that usually move together (or opposite) over the past year but not now. 'This month' means the last 21 trading days ran against the usual link. 'Today' means both markets made a sizeable move the opposite way to usual on the same day. A break can just be noise, but it is often worth a look.",
   // panels
   chart: "The big chart shows whatever you last clicked on the page: a price, a rate, an economic tile or a futures row. Hover (or tap) the line to read values, and use the buttons on the right to change the time span.",
   ranges: "How much history the chart shows, from one month (1M) to everything available (Max).",
@@ -1260,15 +1330,16 @@ function renderAll() {
   hideTip();
   if (activeTab === "overlays") { drawHeader(); drawOverlay(); return; }
   if (activeTab === "fund") { drawHeader(); drawFund(); drawStamps(); return; }
+  if (activeTab === "scan") { drawHeader(); drawScanner(); return; }
   fitSelection(); applyView();
   drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawCot(); drawRates(); drawUK(); drawPolicy(); drawCalendar(); drawStamps(); drawCurve(); drawEcon(); drawResearch();
 }
 
 // ---------- tabs
 // Category tabs (Currencies, Rates, ...) reuse the Homepage panels and just show the ones that belong to them.
-const TAB_HASH = { overlays: "#overlays", fund: "#fundamentals", fx: "#currencies", equities: "#equities", commodities: "#commodities",
+const TAB_HASH = { scan: "#scanner", overlays: "#overlays", fund: "#fundamentals", fx: "#currencies", equities: "#equities", commodities: "#commodities",
   rates: "#rates", cb: "#central-banks", positioning: "#positioning", economy: "#economy", research: "#research" };
-const ALL_TABS = ["home", "fund", "overlays", "fx", "equities", "commodities", "rates", "cb", "positioning", "economy", "research"];
+const ALL_TABS = ["home", "scan", "fund", "overlays", "fx", "equities", "commodities", "rates", "cb", "positioning", "economy", "research"];
 let activeTab = "home";
 try {
   const fromHash = Object.keys(TAB_HASH).find(k => TAB_HASH[k] === location.hash);
@@ -1300,8 +1371,8 @@ function fitSelection() {
 function showTab(name) {
   activeTab = name;
   document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === name));
-  $("tab-fund").hidden = name !== "fund"; $("tab-overlays").hidden = name !== "overlays";
-  $("tab-home").hidden = name === "fund" || name === "overlays";
+  $("tab-fund").hidden = name !== "fund"; $("tab-overlays").hidden = name !== "overlays"; $("tab-scan").hidden = name !== "scan";
+  $("tab-home").hidden = name === "fund" || name === "overlays" || name === "scan";
   try { localStorage.setItem("mt-tab", name); history.replaceState(null, "", TAB_HASH[name] || location.pathname); } catch (e) {}
   hideTip(); closeSearch();
   if (name === "overlays") drawOverlay(); else renderAll();
@@ -1691,6 +1762,148 @@ function drawFund() {
   after.forEach(f => f());
 }
 
+// ---------- scanner (worked out by scripts/scanner.py in the refresh job; this only draws it)
+let scanMovesView = "flagged", scanTrendBy = "trend", scanCorrWin = "3m";
+try { scanCorrWin = localStorage.getItem("mt-scan-corr") || "3m"; } catch (e) {}
+const SCAN_GROUPS = ["Equities", "FX", "Commodities", "Rates", "Credit & risk"];
+const scanUnit = (k, v, d) => v == null ? "—" : (v > 0 ? "+" : v < 0 ? "−" : "") +
+  (k === "pct" ? fmt(Math.abs(v), d == null ? 2 : d) + "%" : k === "bp" ? fmt(Math.abs(v), 0) + " bp" : fmt(Math.abs(v), 1) + " pts");
+const scanDay = d => d ? new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : "";
+function scanPick(m) {
+  if (m.code) { selected = { kind: "cot", id: m.code }; if (RANGES[range] < 1000) range = "5Y"; }
+  else selected = { kind: m.src === "td" ? "td" : "fred", id: m.key };
+  showTab("home"); window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function scanRow(m, cls) {
+  const r = el("tr", "row" + (cls ? " " + cls : "")); r.tabIndex = 0;
+  const c = el("td", "nm", m.name); c.append(el("span", "sym", m.group + (m.date ? " · " + scanDay(m.date) : ""))); r.append(c);
+  r.onclick = () => scanPick(m); r.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); scanPick(m); } };
+  return r;
+}
+function zCell(z, lim) {
+  const td = el("td", "num" + (z != null && Math.abs(z) >= 2 ? " hot" : ""));
+  if (z == null) { td.textContent = "—"; return td; }
+  const bar = el("span", "zbar"), i = el("i", z > 0 ? "up" : "down"), w = Math.min(Math.abs(z), lim) / lim * 50;
+  i.style.width = w + "%"; i.style.left = (z > 0 ? 50 : 50 - w) + "%"; bar.append(i);
+  td.append(document.createTextNode((z > 0 ? "+" : z < 0 ? "−" : "") + fmt(Math.abs(z), 1) + " "), bar);
+  return td;
+}
+function scanToggle(box, opts, cur, set) {
+  box.replaceChildren();
+  opts.forEach(([k, label]) => { const b = el("button", "", label); b.type = "button"; b.setAttribute("aria-pressed", cur === k); b.onclick = () => { set(k); drawScanner(); }; box.append(b); });
+}
+function scanAlerts(S) {
+  const out = [], ms = S.markets || [], name = k => (ms.find(m => m.key === k) || {}).name || k;
+  ms.forEach(m => {
+    if (m.z1 != null && Math.abs(m.z1) >= 2) out.push({ m, tag: "Big move", score: Math.abs(m.z1) + 1, when: m.date,
+      text: m.name + " moved " + scanUnit(m.kind, m.chg1) + " on the day, " + fmt(Math.abs(m.z1), 1) + "× its normal daily swing." });
+    else if (m.z5 != null && Math.abs(m.z5) >= 2) out.push({ m, tag: "Big week", score: Math.abs(m.z5), when: m.date,
+      text: m.name + " is " + scanUnit(m.kind, m.chg5) + " over 5 days, " + fmt(Math.abs(m.z5), 1) + "× a normal week." });
+    (m.crosses || []).slice(-1).forEach(c => out.push({ m, tag: c.type === "golden" ? "Golden x" : c.type === "death" ? "Death x" : "200-day", score: 1.5, when: c.date,
+      text: c.type === "up200" ? m.name + " crossed above its 200-day average." : c.type === "down200" ? m.name + " fell below its 200-day average." :
+        c.type === "golden" ? m.name + ": 50-day average crossed above the 200-day (golden cross)." : m.name + ": 50-day average fell below the 200-day (death cross)." }));
+  });
+  (S.cot || []).filter(c => c.flag).forEach(c => out.push({ m: c, tag: "Crowded", score: 1.2 + Math.abs(c.index - 50) / 100, when: c.date,
+    text: (c.who === "funds" ? "Hedge funds are " : "Large speculators are ") + (c.index === 100 || c.index === 0 ? "the most " : "close to their most ") +
+      (c.flag === "long" ? "long " : "short ") + c.name + " in 3 years (" + fmt(c.index, 0) + " on a 0 to 100 scale)." }));
+  ((S.corr || {}).breaks || []).forEach(b => out.push({ m: ms.find(m => m.key === b.a), tag: b.type === "today" ? "Odd today" : "Link broke", score: b.type === "today" ? 2.5 : 1.3, when: b.date || "",
+    text: breakText(b, name) }));
+  return out.sort((a, b) => (b.when || "").localeCompare(a.when || "") || b.score - a.score);
+}
+function breakText(b, name) {
+  const usual = b.usual > 0 ? "usually move together" : "usually move in opposite directions";
+  if (b.type === "today") return name(b.a) + " and " + name(b.b) + " " + usual + " (1-year correlation " + fmt(b.usual, 2) + "), but today " +
+    name(b.a) + " was " + (b.za > 0 ? "up" : "down") + " and " + name(b.b) + " " + (b.zb > 0 ? "up" : "down") + ".";
+  return name(b.a) + " and " + name(b.b) + " " + usual + " (1-year correlation " + fmt(b.usual, 2) + "), but over the last month it is " + fmt(b.now, 2) + ".";
+}
+function drawScanner() {
+  const S = D.scan;
+  $("scanIntro").replaceChildren(document.createTextNode("Simple rule-based checks across every market the terminal collects. Nothing here costs extra data calls: it is worked out from the prices, rates and positioning already downloaded. "),
+    el("b", "", S && S.updated ? "Last worked out " + ukTime(S.updated) + " UK time (" + relTime(S.updated) + ")." : "Waiting for the first refresh run to work out the scanner."));
+  const ids = ["scanAlerts", "scanMoves", "scanTrend", "scanMA", "scanCot", "scanCorr", "scanBreaks"];
+  ids.forEach(i => $(i).replaceChildren());
+  if (!S) return;
+  const ms = S.markets || [];
+  const byGroup = (a, b) => SCAN_GROUPS.indexOf(a.group) - SCAN_GROUPS.indexOf(b.group);
+
+  // alerts
+  const al = scanAlerts(S);
+  if (!al.length) $("scanAlerts").append(el("li", "", "Nothing unusual by these rules right now."));
+  al.slice(0, 30).forEach(a => {
+    const li = el("li", a.m ? "click" : ""); const tg = el("span", "tag" + (a.tag === "Big move" || a.tag === "Odd today" ? " hi" : ""), a.tag);
+    li.append(tg, el("span", "", a.text), el("span", "when", scanDay(a.when)));
+    if (a.m) { li.tabIndex = 0; li.onclick = () => scanPick(a.m); li.onkeydown = e => { if (e.key === "Enter") scanPick(a.m); }; }
+    $("scanAlerts").append(li);
+  });
+
+  // unusual moves
+  scanToggle($("scanMovesToggle"), [["flagged", "Biggest 12"], ["all", "All markets"]], scanMovesView, k => scanMovesView = k);
+  const mt = $("scanMoves"); mt.append(headRow(["", "Day", "Size", "5 days", "Size "]));
+  const mv = ms.filter(m => m.z1 != null).sort((a, b) => Math.max(Math.abs(b.z1), Math.abs(b.z5)) - Math.max(Math.abs(a.z1), Math.abs(a.z5)));
+  (scanMovesView === "all" ? mv : mv.slice(0, 12)).forEach(m => {
+    const r = scanRow(m); const c1 = el("td"); c1.append(chgNode(m.chg1, scanUnit(m.kind, Math.abs(m.chg1)).replace("+", ""))); r.append(c1, zCell(m.z1, 4));
+    const c2 = el("td"); c2.append(chgNode(m.chg5, scanUnit(m.kind, Math.abs(m.chg5)).replace("+", ""))); r.append(c2, zCell(m.z5, 4)); mt.append(r);
+  });
+
+  // trend ranking
+  scanToggle($("scanTrendToggle"), [["trend", "Overall"], ["s1w", "1 week"], ["s1m", "1 month"], ["s3m", "3 months"]], scanTrendBy, k => scanTrendBy = k);
+  const tt = $("scanTrend"); tt.append(headRow(["", "1W", "1M", "3M", "Score"]));
+  ms.filter(m => m[scanTrendBy] != null).sort((a, b) => b[scanTrendBy] - a[scanTrendBy]).forEach(m => {
+    const r = scanRow(m);
+    [["t1w", "s1w"], ["t1m", "s1m"], ["t3m", "s3m"]].forEach(([t, s]) => { const c = el("td", "num" + (scanTrendBy === s ? " hot" : "")); c.append(chgNode(m[t], scanUnit(m.kind, Math.abs(m[t]), 1).replace("+", ""))); c.title = "Trend score " + fmt(m[s], 1); r.append(c); });
+    r.append(zCell(m[scanTrendBy === "trend" ? "trend" : scanTrendBy], 3)); tt.append(r);
+  });
+
+  // moving averages
+  const at = $("scanMA"); at.append(headRow(["", "50d", "200d", "vs 200d", "Recent"]));
+  let g = "";
+  ms.filter(m => m.ma200 != null).sort(byGroup).forEach(m => {
+    if (m.group !== g) { g = m.group; const gr = el("tr", "cot-group"); const c = el("td", "", g); c.colSpan = 5; gr.append(c); at.append(gr); }
+    const r = scanRow(m);
+    const pos = up => { const c = el("td", "num"); c.append(chgNode(up ? 1 : -1, up ? "above" : "below")); return c; };
+    const v = el("td"); v.append(chgNode(m.vs200, scanUnit(m.kind, Math.abs(m.vs200), 1).replace("+", "")));
+    const last = (m.crosses || []).at(-1);
+    const rc = el("td", "num" + (last ? " hot" : ""), last ? ({ up200: "↑ 200d", down200: "↓ 200d", golden: "golden x", death: "death x" })[last.type] + " " + scanDay(last.date) : "");
+    r.append(pos(m.above50), pos(m.above200), v, rc); at.append(r);
+  });
+
+  // stretched positioning
+  const ct = $("scanCot"); ct.append(headRow(["", "Who", "Net", "vs 3Y", "Index"]));
+  const cots = (S.cot || []).slice().sort((a, b) => Math.abs(b.index - 50) - Math.abs(a.index - 50));
+  if (cots.length) $("scanCotAsOf").textContent = "positions as of " + scanDay(cots.reduce((a, c) => c.date > a ? c.date : a, ""));
+  cots.forEach(c => {
+    const r = scanRow({ code: c.code, name: c.name, group: c.group }, "");
+    const mtr = el("span", "meter"); const dot = el("i"); dot.style.left = c.index + "%"; mtr.append(dot); const mc = el("td"); mc.append(mtr);
+    r.append(el("td", "num", c.who === "funds" ? "funds" : "specs"), el("td", "num", fmtK(c.net)), mc,
+      el("td", "num" + (c.flag ? " hot" : ""), fmt(c.index, 0) + (c.flag ? (c.flag === "long" ? " long" : " short") : "")));
+    ct.append(r);
+  });
+
+  // correlation map
+  const C = S.corr || {};
+  scanToggle($("scanCorrToggle"), [["3m", "Last 3 months"], ["1y", "Last year"]], scanCorrWin, k => { scanCorrWin = k; try { localStorage.setItem("mt-scan-corr", k); } catch (e) {} });
+  const mat = (C.matrix || {})[scanCorrWin];
+  if (mat) {
+    const t = el("table", "corr"), hr = el("tr"); hr.append(el("th"));
+    C.names.forEach(n => { const th = el("th", "ch"); th.append(el("span", "", n)); hr.append(th); }); t.append(hr);
+    C.names.forEach((n, i) => {
+      const tr = el("tr"); tr.append(el("th", "rh", n));
+      mat[i].forEach((v, j) => {
+        const td = el("td", i === j ? "dg" : "", i === j || v == null ? "" : (v < 0 ? "−" : "") + fmt(Math.abs(v), 1).replace(/^0/, ""));
+        if (i !== j && v != null) { td.style.background = "color-mix(in srgb, " + (v > 0 ? "var(--accent)" : "var(--down)") + " " + Math.round(Math.abs(v) * 85) + "%, transparent)"; td.title = n + " vs " + C.names[j] + ": " + fmt(v, 2); }
+        tr.append(td);
+      });
+      t.append(tr);
+    });
+    $("scanCorr").append(t);
+  }
+  const nm = k => (ms.find(m => m.key === k) || {}).name || k;
+  if (!(C.breaks || []).length) $("scanBreaks").append(el("li", "", "No usual relationship has broken this month."));
+  (C.breaks || []).forEach(b => { const li = el("li"); li.append(el("span", "tag" + (b.type === "today" ? " hi" : ""), b.type === "today" ? "Today" : "This month"), el("span", "", breakText(b, nm))); $("scanBreaks").append(li); });
+
+  $("scanMissing").textContent = "Not covered yet: " + (S.missing || []).join(" ");
+}
+
 // ---------- loading
 async function getJSON(name) {
   try { const r = await fetch("data/" + name + "?t=" + Date.now(), { cache: "no-store" }); return r.ok ? await r.json() : null; }
@@ -1698,9 +1911,9 @@ async function getJSON(name) {
 }
 let fundAt = 0, fundSeen = null;
 async function load() {
-  const names = ["prices", "price_history", "fred", "cot", "boe", "calendar", "ff", "status", "policy", "research"];
+  const names = ["prices", "price_history", "fred", "cot", "boe", "calendar", "ff", "status", "policy", "research", "scanner"];
   const got = await Promise.all(names.map(n => getJSON(n + ".json")));
-  const keys = ["prices", "hist", "fred", "cot", "boe", "cal", "ff", "status", "policy", "research"];
+  const keys = ["prices", "hist", "fred", "cot", "boe", "cal", "ff", "status", "policy", "research", "scan"];
   const next = {}; keys.forEach((k, i) => next[k] = got[i] || D[k]);
   // economic data is larger and changes a few times a day: re-read it every 30 minutes, or when its source changed
   const fst = next.status && next.status.sources && next.status.sources.fundamentals;
