@@ -413,7 +413,7 @@ const HELP = {
   FX: "Exchange rates. EUR/USD means how many US dollars one euro buys. Rising means the first currency is getting stronger. They update every 20 minutes on weekdays.",
   Commodities: "Gold, silver, oil and bitcoin. Silver and oil are shown through ETFs because their direct prices are not on the free data plan.",
   fxToggle: "Dollar pairs are the rates against the US dollar that are downloaded. Crosses are pairs without the dollar, like EUR/GBP, worked out by dividing two dollar pairs.",
-  cot: "Every week the US regulator (the CFTC) publishes how different kinds of traders are positioned in futures. Websites differ because they pick different reports and trader groups: use the buttons to switch between large speculators (Legacy report), hedge funds (leveraged funds or managed money) and asset managers. All numbers are futures only, positions as of Tuesday.",
+  cot: "Every week the US regulator (the CFTC) publishes how different kinds of traders are positioned in futures. Websites differ because they pick different reports and trader groups: use the buttons to switch between leveraged funds (hedge funds; managed money for commodities), large speculators (Legacy report) and asset managers. All numbers are futures only, positions as of Tuesday.",
   econ: "Headline US economic figures from FRED (the St. Louis Fed's free database). Click a tile to see its history in the big chart.",
   curve: "The interest rate the US government pays to borrow for different lengths of time, from 3 months to 30 years. Normally longer loans pay more; when short rates are above long rates the curve is 'inverted', which has often come before recessions.",
   rates: "US interest rates, credit spreads and key market gauges from FRED. 'Chg' is the change from the day before.",
@@ -779,14 +779,14 @@ function cotMarket(code) { return (D.cot && D.cot.markets || []).find(m => m.cod
 // Which trader group the COT panel shows. Each is a different CFTC report/category, so other
 // websites only match when they use the same one.
 const COT_VIEWS = {
+  funds: { col: 6, btn: "Leveraged funds", label: "leveraged funds (managed money for commodities)",
+           note: "Leveraged funds are hedge funds and other trading firms. Rates, stocks, currencies and bitcoin: \"leveraged funds\" from the CFTC Traders in Financial Futures (TFF) report. Commodities have no leveraged funds group, so they show the closest equivalent, \"managed money\", from the CFTC Disaggregated report. This is what most bank research and Bloomberg/Reuters stories quote. It can have the opposite sign to large speculators, because asset managers sit in the speculator group too." },
   spec: { col: 1, btn: "Large speculators", label: "large speculators",
           note: "CFTC Legacy report, \"non-commercial\" traders: everyone big enough to report who is not hedging a business. This is the number most free sites (Investing.com, Barchart, MarketBeat) call \"CFTC speculative net positions\"." },
-  funds: { col: 6, btn: "Hedge funds", label: "hedge funds",
-           note: "Rates, stocks, currencies and bitcoin: \"leveraged funds\" from the CFTC Traders in Financial Futures (TFF) report. Commodities: \"managed money\" from the CFTC Disaggregated report. This is what most bank research and Bloomberg/Reuters stories quote. It can have the opposite sign to large speculators, because asset managers sit in the speculator group too." },
   am: { col: 7, btn: "Asset managers", label: "asset managers",
         note: "\"Asset manager/institutional\" from the CFTC Traders in Financial Futures (TFF) report: pension funds, insurers and mutual funds. Only exists for financial futures, so commodities are left blank." },
 };
-let cotView = "spec";
+let cotView = "funds";
 try { const v = localStorage.getItem("mt-cot"); if (COT_VIEWS[v]) cotView = v; } catch (e) {}
 const cotCol = () => COT_VIEWS[cotView].col;
 function cotSeries(m, col) { col = col || cotCol(); return m.obs.filter(p => p[col] != null).map(p => [p[0], p[col]]); }
@@ -1348,7 +1348,7 @@ function ovCatalogue() {
   (D.cot && D.cot.markets || []).forEach(m => {
     cat["cot:" + m.code] = { name: m.name + " large speculators net", short: "COT " + m.name, group: "Futures positioning (COT)",
       pts: () => cotSeries(m, 1), fmt: v => fmt(v, 0), freq: "weekly", src: "cot" };
-    if (m.obs.some(p => p[6] != null)) cat["cotf:" + m.code] = { name: m.name + " hedge funds net (" + (m.funds || "leveraged funds") + ")", short: "COT funds " + m.name, group: "Futures positioning (COT)",
+    if (m.obs.some(p => p[6] != null)) cat["cotf:" + m.code] = { name: m.name + " leveraged funds net (" + (m.funds || "leveraged funds") + ")", short: "COT funds " + m.name, group: "Futures positioning (COT)",
       pts: () => cotSeries(m, 6), fmt: v => fmt(v, 0), freq: "weekly", src: "cot" };
   });
   return cat;
