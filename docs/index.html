@@ -146,6 +146,7 @@ details.tbl table{margin-top:6px;max-width:360px}
 :root{--ov-bg:#fbfbf9;--ev:#b8860b}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ov-bg:#111111;--ev:#d9a933}}
 :root[data-theme="dark"]{--ov-bg:#111111;--ev:#d9a933}
+.fx-toggle{margin:-2px 0 8px}
 /* fundamentals */
 .subtabs{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 12px}
 .subtabs button{font:500 12.5px "IBM Plex Mono",monospace;padding:4px 12px}
@@ -321,7 +322,7 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
   </div>
 
   <footer>
-    Prices: Twelve Data (currencies, gold and bitcoin every 20 minutes on weekdays; ETFs every 15 minutes in US market hours). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Futures positioning: CFTC Commitments of Traders, legacy futures-only report (released Fridays for the prior Tuesday). UK rates and sterling: Bank of England. Earnings dates: Finnhub. Fundamentals: FRED, ONS, ECB, Statistics Bureau of Japan, SNB, Statistics Canada, RBA, OECD and BIS (checked every 6 hours).
+    Prices: Twelve Data (currencies, gold and bitcoin every 20 minutes on weekdays; ETFs every 20 minutes in US market hours; the 21 currency crosses are worked out from the dollar pairs). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Futures positioning: CFTC Commitments of Traders, legacy futures-only report (released Fridays for the prior Tuesday). UK rates and sterling: Bank of England. Earnings dates: Finnhub. Fundamentals: FRED, ONS, ECB, Statistics Bureau of Japan, SNB, Statistics Canada, RBA, OECD and BIS (checked every 6 hours).
     The data refreshes on GitHub every 10 minutes (each source on its own timer, shown under each panel in UK time) and this page re-reads it every 2 minutes. Economic calendar: Forex Factory. Not investment advice.
   </footer>
 </div>
@@ -388,7 +389,7 @@ const ukTime = iso => {
 };
 const SRC_LABEL = { prices_fx: "FX, gold & bitcoin", prices_us: "ETFs", fred: "FRED", boe: "Bank of England", cot: "CFTC",
   calendar: "earnings & US dates", forexfactory: "Forex Factory", price_history: "price history", fundamentals: "economic data" };
-const SRC_EVERY = { prices_fx: "every 20 min on weekdays", prices_us: "every 15 min in US market hours", fred: "every 30 min", boe: "every 30 min",
+const SRC_EVERY = { prices_fx: "every 20 min on weekdays", prices_us: "every 20 min in US market hours", fred: "every 30 min", boe: "every 30 min",
   cot: "every 10 min (new report weekly)", calendar: "hourly", forexfactory: "every 30 min", price_history: "daily", fundamentals: "every 6 hours" };
 function stampNode(srcs) {
   const st = D.status && D.status.sources || {};
@@ -442,8 +443,8 @@ function selectedSeries() {
              cot: true, last: st.net, chg: st.chg, chgText: st.chg == null ? "" : fmtK(st.chg) + " this week", zero: true };
   }
   if (selected.kind === "td") {
-    const q = (D.prices && D.prices.quotes || []).find(q => q.symbol === selected.id);
-    const pts = (D.hist && D.hist.series[selected.id] || []).slice();
+    const q = allQuotes().find(q => q.symbol === selected.id);
+    const pts = histOf(selected.id).slice();
     // add today's live price as the last point when it is newer
     if (q && q.price != null && q.as_of) {
       const day = q.as_of.slice(0, 10);
@@ -584,13 +585,54 @@ function lineChart(box, series, opt) {
 }
 
 // ---------- market tables
+// ---------- currency crosses, worked out from the dollar pairs
+const G8 = ["EUR", "GBP", "AUD", "NZD", "USD", "CAD", "CHF", "JPY"];   // usual market quoting order
+const CCY_NAME = { EUR: "Euro", GBP: "British pound", AUD: "Australian dollar", NZD: "New Zealand dollar", USD: "US dollar", CAD: "Canadian dollar", CHF: "Swiss franc", JPY: "Japanese yen" };
+const USD_LEG = { EUR: ["EUR/USD", 1], GBP: ["GBP/USD", 1], AUD: ["AUD/USD", 1], NZD: ["NZD/USD", 1], CAD: ["USD/CAD", -1], CHF: ["USD/CHF", -1], JPY: ["USD/JPY", -1] };
+let fxView = "majors";
+try { if (localStorage.getItem("mt-fx") === "crosses") fxView = "crosses"; } catch (e) {}
+const allQuotes = () => (D.prices && D.prices.quotes || []).concat(D.xq || []);
+const histOf = sym => (D.hist && D.hist.series[sym]) || (D.xhist && D.xhist[sym]) || [];
+function buildCrosses() {
+  const quotes = D.prices && D.prices.quotes || [], hist = D.hist && D.hist.series || {};
+  const qOf = s => quotes.find(q => q.symbol === s);
+  // value of one unit of currency c in US dollars
+  const usd = (c, v) => c === "USD" ? 1 : v == null ? null : USD_LEG[c][1] > 0 ? v : 1 / v;
+  const xq = [], xhist = {};
+  for (let i = 0; i < G8.length; i++) for (let j = i + 1; j < G8.length; j++) {
+    const b = G8[i], c = G8[j]; if (b === "USD" || c === "USD") continue;
+    const sym = b + "/" + c, lb = qOf(USD_LEG[b][0]), lc = qOf(USD_LEG[c][0]);
+    const q = { symbol: sym, name: CCY_NAME[b] + " / " + CCY_NAME[c], group: "FX", derived: true };
+    if (lb && lc && lb.price != null && lc.price != null) {
+      q.price = usd(b, lb.price) / usd(c, lc.price);
+      const pb = usd(b, lb.prev_close), pc = usd(c, lc.prev_close);
+      if (pb != null && pc != null) { const prev = pb / pc; q.prev_close = prev; q.pct = (q.price / prev - 1) * 100; }
+      q.as_of = [lb.as_of, lc.as_of].filter(Boolean).sort().pop();
+      if (lb.error || lc.error) q.error = "a dollar pair behind it didn't refresh";
+    } else q.error = "waiting for " + [USD_LEG[b][0], USD_LEG[c][0]].join(" and ");
+    xq.push(q);
+    const hb = hist[USD_LEG[b][0]] || [], hc = new Map((hist[USD_LEG[c][0]] || []).map(p => [p[0], p[1]]));
+    xhist[sym] = hb.filter(p => hc.has(p[0]) && p[1] && hc.get(p[0])).map(p => [p[0], usd(b, p[1]) / usd(c, hc.get(p[0]))]);
+  }
+  D.xq = xq; D.xhist = xhist;
+}
+
 function drawMarkets() {
   const wrap = $("markets"); wrap.replaceChildren();
   const quotes = D.prices && D.prices.quotes || [];
   ["Equities", "FX", "Commodities"].forEach(g => {
     const p = el("section", "panel"); const h = el("h2", "", g === "Commodities" ? "Commodities & crypto" : g === "FX" ? "Currencies" : "Equities (ETFs)"); p.append(h, stampNode(g === "Equities" ? "prices_us" : g === "FX" ? "prices_fx" : "prices_fx,prices_us"));
+    if (g === "FX") {
+      const tg = el("div", "ov-group fx-toggle"); tg.setAttribute("role", "group"); tg.setAttribute("aria-label", "Which currency pairs");
+      [["majors", "Dollar pairs"], ["crosses", "Crosses (" + (D.xq || []).length + ")"]].forEach(([k, lab]) => {
+        const b = el("button", "", lab); b.type = "button"; b.setAttribute("aria-pressed", fxView === k);
+        b.onclick = () => { fxView = k; try { localStorage.setItem("mt-fx", k); } catch (e) {} drawMarkets(); }; tg.append(b);
+      });
+      p.append(tg);
+      if (fxView === "crosses") p.append(el("p", "note", "Worked out from the dollar pairs, so they move with them; no extra data calls."));
+    }
     const t = el("table"); const hr = el("tr"); ["", "Last", "Today", "1Y"].forEach(x => hr.append(el("th", "", x))); t.append(hr);
-    const qs = quotes.filter(q => q.group === g);
+    const qs = g === "FX" && fxView === "crosses" ? (D.xq || []) : quotes.filter(q => q.group === g);
     if (!qs.length) { p.append(el("div", "empty", "Waiting for the first price refresh.")); wrap.append(p); return; }
     qs.forEach(q => {
       const r = el("tr", "row" + (selected.kind === "td" && selected.id === q.symbol ? " sel" : "")); r.tabIndex = 0;
@@ -599,7 +641,7 @@ function drawMarkets() {
       else {
         r.append(el("td", "num", fmt(q.price, priceDigits(q.symbol, q.price))));
         const c2 = el("td"); c2.append(chgNode(q.pct, (q.pct > 0 ? "+" : "") + fmt(q.pct, 2) + "%")); if (q.error) { c2.append(el("span", "stale", " old")); c2.title = "Latest refresh failed: " + q.error; } r.append(c2);
-        const c3 = el("td"); c3.append(spark((D.hist && D.hist.series[q.symbol] || []).slice(-252))); r.append(c3);
+        const c3 = el("td"); c3.append(spark(histOf(q.symbol).slice(-252))); r.append(c3);
       }
       const pick = () => { selected = { kind: "td", id: q.symbol }; renderAll(); };
       r.onclick = pick; r.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
@@ -807,8 +849,8 @@ try { const saved = JSON.parse(localStorage.getItem("mt-overlay") || "null"); if
 const ovSave = () => { try { localStorage.setItem("mt-overlay", JSON.stringify(OV)); } catch (e) {} };
 
 function tdPoints(sym) {
-  const q = (D.prices && D.prices.quotes || []).find(q => q.symbol === sym);
-  const pts = (D.hist && D.hist.series[sym] || []).slice();
+  const q = allQuotes().find(q => q.symbol === sym);
+  const pts = histOf(sym).slice();
   if (q && q.price != null && q.as_of) {
     const day = q.as_of.slice(0, 10);
     if (pts.length && pts.at(-1)[0] === day) pts[pts.length - 1] = [day, q.price];
@@ -819,8 +861,8 @@ function tdPoints(sym) {
 // Every series the terminal collects, as one catalogue: key -> {name, group, pts, fmt, freq, src}
 function ovCatalogue() {
   const cat = {};
-  (D.prices && D.prices.quotes || []).forEach(q => {
-    cat["td:" + q.symbol] = { name: q.name, short: q.symbol, group: "Prices", pts: () => tdPoints(q.symbol),
+  allQuotes().forEach(q => {
+    cat["td:" + q.symbol] = { name: q.name, short: q.symbol, group: q.derived ? "FX crosses (worked out from dollar pairs)" : "Prices", pts: () => tdPoints(q.symbol),
       fmt: v => fmt(v, priceDigits(q.symbol, v)), freq: "live", src: q.symbol.includes("/") ? "prices_fx" : "prices_us" };
   });
   [["fred", D.fred], ["boe", D.boe]].forEach(([k, src]) => Object.entries(src && src.series || {}).forEach(([id, s]) => {
@@ -1197,6 +1239,7 @@ async function load() {
     if (f) { next.fund = f; fundAt = Date.now(); fundSeen = fundStamp; } else next.fund = D.fund;
   } else next.fund = D.fund;
   D = next;
+  buildCrosses();
   renderAll();
 }
 let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderAll, 150); });

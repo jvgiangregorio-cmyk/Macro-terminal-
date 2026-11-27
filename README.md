@@ -10,8 +10,8 @@ A personal markets dashboard (rates, FX, equities, commodities, economic data an
 
 | Data | Source | How often |
 |---|---|---|
-| Currencies, gold, bitcoin | Twelve Data | every 20 min, weekdays 06:00–22:00 UTC |
-| Stock, silver and oil ETFs | Twelve Data | every 15 min while US markets are open |
+| Currencies (7 dollar pairs plus USD/CNY; the page works out all 28 crosses between EUR, GBP, JPY, CHF, CAD, AUD, NZD and USD), gold, bitcoin | Twelve Data | every 20 min, weekdays 06:00–22:00 UTC |
+| Stock, silver and oil ETFs | Twelve Data | every 20 min while US markets are open |
 | 1-year daily price history (for charts) | Twelve Data | once a day |
 | Treasury yields, Fed funds, credit spreads, VIX, dollar, CPI, jobs, GDP | FRED | every 30 min (FRED itself updates daily or monthly) |
 | Futures positioning (COT): speculators' net long minus short, 21 markets, 10 years weekly | CFTC public reporting API (no key) | quick check every 10 min; new report each Friday |
