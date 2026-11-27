@@ -20,10 +20,12 @@ below) so nobody's limits are hit, and docs/data/status.json records when each
 source was last checked and last had new data (the page shows both).
 
 Twelve Data's free plan allows 800 calls a day and 8 a minute, where each
-symbol counts as one call. Currencies, gold and bitcoin (8 symbols) refresh
-every 20 minutes on weekdays 06:00-21:59 UTC (~384 calls); the US-listed ETFs
-(8 symbols) every 15 minutes while US markets are open (~250 calls); plus one
-daily history download (16 calls). Total ~650, leaving room for manual runs.
+symbol counts as one call. Currencies, gold and bitcoin (10 symbols) refresh
+every 20 minutes on weekdays 06:00-21:59 UTC (~480 calls); the US-listed ETFs
+(8 symbols) every 20 minutes while US markets are open (~190 calls); plus one
+daily history download (18 calls). Total ~690, leaving room for a manual run.
+The page works out all 28 crosses between the eight major currencies from the
+dollar pairs, so the crosses cost no extra calls.
 
 Run locally:  TWELVEDATA_API_KEY=... FRED_API_KEY=... python scripts/refresh.py
 Options:      --all   fetch everything now, ignoring the schedule rules
@@ -58,7 +60,9 @@ TD_SYMBOLS = [
     ("GBP/USD", "British pound", "FX"),
     ("USD/CNY", "Chinese yuan", "FX"),
     ("AUD/USD", "Australian dollar", "FX"),
+    ("NZD/USD", "New Zealand dollar", "FX"),
     ("USD/CAD", "Canadian dollar", "FX"),
+    ("USD/CHF", "Swiss franc", "FX"),
     ("XAU/USD", "Gold", "Commodities"),
     ("SLV", "Silver (SLV ETF)", "Commodities"),   # XAG/USD is not on the free plan
     ("USO", "Oil (USO ETF)", "Commodities"),      # WTI/USD is not on the free plan
@@ -66,8 +70,8 @@ TD_SYMBOLS = [
 ]
 # Minutes between checks for each source (the job itself runs every 10 minutes).
 SCHEDULE = {
-    "prices_fx": 20,      # Twelve Data, 8 symbols, weekdays 06-22 UTC
-    "prices_us": 15,      # Twelve Data, 8 symbols, US market hours only
+    "prices_fx": 20,      # Twelve Data, 10 symbols, weekdays 06-22 UTC
+    "prices_us": 20,      # Twelve Data, 8 symbols, US market hours only
     "fred": 30,           # FRED data is daily or slower
     "boe": 30,
     "cot": 10,            # quick "is there a new report?" check
