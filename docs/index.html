@@ -198,6 +198,22 @@ tr.fund-detail > td{padding:8px 4px 14px;text-align:left;white-space:normal}
 .tile .v{font:500 20px "IBM Plex Mono",monospace;margin:2px 0}
 .tile .p{font-size:11.5px;color:var(--faint)}
 .empty{color:var(--faint);font-size:13px;padding:8px 0}
+/* research */
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.chips button{font-size:12px;padding:2px 9px;border-radius:999px}
+.news{list-style:none;margin:0;padding:0;max-height:620px;overflow:auto}
+.news li{padding:8px 0;border-bottom:1px solid var(--grid)}
+.news li:last-child{border-bottom:0}
+.news a{color:var(--text);text-decoration:none}
+.news a:hover{text-decoration:underline}
+.news .meta{display:block;font-size:11.5px;color:var(--faint);margin-top:2px}
+.lib{margin-top:10px;border-top:1px solid var(--grid);padding-top:8px;font-size:13px}
+.lib summary{cursor:pointer;color:var(--muted)}
+.lib ul{list-style:none;margin:8px 0 0;padding:0;columns:2 220px;column-gap:18px}
+.lib li{break-inside:avoid;padding:3px 0}
+.lib a{color:var(--text)}
+.lib .meta{display:block;font-size:11.5px;color:var(--faint)}
+.lib p{color:var(--faint);font-size:12px;margin:10px 0 0;line-height:1.5}
 footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
 .hq{display:inline-flex;align-items:center;justify-content:center;position:relative;width:15px;height:15px;margin-left:5px;border:1px solid var(--line);border-radius:50%;font:600 10px/1 "IBM Plex Sans",system-ui,sans-serif;color:var(--faint);background:var(--panel);cursor:help;vertical-align:1px;flex:none;letter-spacing:0;text-transform:none;user-select:none}
 .hq::after{content:"";position:absolute;inset:-7px}
@@ -296,6 +312,18 @@ th .hq{margin-left:3px}
         <div id="calendar"></div>
       </section>
 
+      <section class="panel">
+        <h2 data-help="research">Research <span>free public research · opens on the publisher's site</span></h2>
+        <div class="upd" data-src="research"></div>
+        <div class="chips" id="rchips"></div>
+        <ul class="news" id="research"></ul>
+        <details class="lib">
+          <summary data-help="library">Research library: free research pages with no feed</summary>
+          <ul id="library"></ul>
+          <p>Client-only, so not shown here: the full research of Goldman Sachs, JP Morgan, Morgan Stanley, Citi, Deutsche Bank, Nomura, UBS, Soci&eacute;t&eacute; G&eacute;n&eacute;rale, Santander, Cr&eacute;dit Agricole CIB and Natixis institutional research, Bernstein Research, InTouch Capital Markets, Trade The News, and the FactSet and LSEG platforms.</p>
+        </details>
+      </section>
+
     </div>
   </div>
   </div>
@@ -342,7 +370,7 @@ th .hq{margin-left:3px}
   </div>
 
   <footer>
-    Prices: Twelve Data (currencies, gold and bitcoin every 20 minutes on weekdays; ETFs every 20 minutes in US market hours; the 21 currency crosses are worked out from the dollar pairs). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Futures positioning: CFTC Commitments of Traders, legacy futures-only report (released Fridays for the prior Tuesday). UK rates and sterling: Bank of England. Earnings dates: Finnhub. Fundamentals: FRED, ONS, ECB, Statistics Bureau of Japan, SNB, Statistics Canada, RBA, OECD and BIS (checked every 6 hours).
+    Prices: Twelve Data (currencies, gold and bitcoin every 20 minutes on weekdays; ETFs every 20 minutes in US market hours; the 21 currency crosses are worked out from the dollar pairs). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Futures positioning: CFTC Commitments of Traders, legacy futures-only report (released Fridays for the prior Tuesday). UK rates and sterling: Bank of England. Earnings dates: Finnhub. Research: publishers' RSS feeds, checked hourly (headlines and links only; the reports stay on the publishers' sites). Fundamentals: FRED, ONS, ECB, Statistics Bureau of Japan, SNB, Statistics Canada, RBA, OECD and BIS (checked every 6 hours).
     The data refreshes on GitHub every 10 minutes (each source on its own timer, shown under each panel in UK time) and this page re-reads it every 2 minutes. Economic calendar: Forex Factory. Not investment advice.
   </footer>
 </div>
@@ -357,7 +385,7 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 const SVGNS = "http://www.w3.org/2000/svg";
 const sv = (tag, attrs) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); return e; };
 
-let D = { prices: null, hist: null, fred: null, cot: null, boe: null, cal: null, ff: null, status: null, fund: null, policy: null };
+let D = { prices: null, hist: null, fred: null, cot: null, boe: null, cal: null, ff: null, status: null, fund: null, policy: null, research: null };
 
 // ---------- "?" help buttons: hover on a computer, tap or click on a phone
 const HELP = {
@@ -381,6 +409,9 @@ const HELP = {
   "vs now": "How far the expected rate is from today's rate, in basis points (bp). 25 bp is one standard move. Positive means hikes are priced, negative means cuts.",
   "Cut / Hold / Hike": "The market's odds for this meeting's decision, in percent.",
   Odds: "The rough chance of a 25 bp move at this meeting, worked out from how much the expected rate changes at the meeting. 50% means half a move is priced.",
+  research: "Headlines from banks' and publishers' free public research: ING, Nordea, the Wall Street Journal, Goldman Sachs' podcast, FactSet and the Fed's Beige Book. Click a headline to read it on the publisher's own site; nothing is copied here. Checked every hour.",
+  rchips: "Show one source at a time, or All for everything, newest first.",
+  library: "Banks that publish free research on their websites but offer no feed we can read automatically. These are plain links to their research pages.",
   cal: "Economic data releases and big company results coming up, so you know what could move markets. Times are UK time.",
   ff: "This week's economic releases from Forex Factory. HIGH marks the ones that usually move markets most, such as jobs reports, inflation and central bank decisions.",
   earn: "When big US companies report their quarterly results. EPS est. is what analysts expect the company to earn per share.",
@@ -603,6 +634,44 @@ document.querySelectorAll("[data-help]").forEach(n => {
 });
 let selected = { kind: "td", id: "SPY" };
 let range = "1Y";
+let researchFilter = "All";
+// Free research pages that have no feed: [name, what's there, link]
+const LIBRARY = [
+  ["ABN AMRO", "Group Economics research and forecasts", "https://www.abnamro.com/research/en/home"],
+  ["Barclays Private Bank", "Podcasts", "https://podcasts.apple.com/podcast/id1534752624"],
+  ["Bernstein", "Wealth market outlooks", "https://www.bernstein.com/our-insights/wealth-management-advice.html"],
+  ["CaixaBank", "CaixaBank Research publications", "https://www.caixabankresearch.com/en/publications"],
+  ["CIBC", "Economics thought leadership", "https://thoughtleadership.cibc.com/"],
+  ["Citi", "Citi GPS thematic reports", "https://www.citigroup.com/global/insights/citigps"],
+  ["Columbia Threadneedle", "Insights", "https://columbiathreadneedle.com/en/be/intermediary/insights"],
+  ["Cr\u00e9dit Agricole", "Group economic research", "https://etudes-economiques.credit-agricole.com/en/welcome-eco-website"],
+  ["Danske Bank", "Danske Research (Weekly Focus and more)", "https://research.danskebank.com/"],
+  ["DBS", "Group Research", "https://www.dbs.com.sg/sme/aics/our-approach.page"],
+  ["Deutsche Bank", "Deutsche Bank Research (public part)", "https://www.dbresearch.com/"],
+  ["DWS", "CIO View", "https://www.dws.com/en-dk/insights/cio-view/"],
+  ["FactSet", "Earnings Insight (John Butters)", "https://insight.factset.com/author/john-butters"],
+  ["Fed", "Beige Book archive", "https://www.federalreserve.gov/monetarypolicy/publications/beige-book-default.htm"],
+  ["Goldman Sachs", "Insights", "https://www.goldmansachs.com/insights"],
+  ["HSBC Asset Management", "Investment insights", "https://www.assetmanagement.hsbc.co.uk/en/intermediary/investment-views/investment-insights"],
+  ["Invesco", "Insights", "https://invesco.com/fi/en/insights.html"],
+  ["JP Morgan", "Asset Management market updates and Guide to the Markets", "https://am.jpmorgan.com/us/en/asset-management/institutional/insights/market-insights/market-updates/"],
+  ["KBC", "KBC Economics", "https://www.kbc.com/en/kbc-economics.html"],
+  ["Lloyds Bank", "Market insights", "https://www.lloydsbank.com/business/corporate-banking/market-insights.html"],
+  ["LSEG", "Insights", "https://www.lseg.com/en/insights"],
+  ["Morgan Stanley", "Thoughts on the Market (daily podcast)", "https://www.morganstanley.com/ideas/thoughts-on-the-market"],
+  ["MUFG", "MUFG Research (FX)", "https://www.mufgresearch.com/"],
+  ["Neuberger Berman", "CIO Weekly Perspectives", "https://www.nb.com/en/fr/cio-weekly"],
+  ["Nomura", "Nomura Connects", "https://www.nomuraconnects.com/"],
+  ["OCBC", "Treasury research", "https://www.ocbc.com/business-banking/corporates/treasury-services/research"],
+  ["Scotiabank", "Economics publications", "https://www.scotiabank.com/ca/en/about/economics.html"],
+  ["SEB", "Research and strategy", "https://sebgroup.com/our-offering/research-and-strategy"],
+  ["Soci\u00e9t\u00e9 G\u00e9n\u00e9rale", "Economic research", "https://www.societegenerale.com/en/economic-research"],
+  ["Standard Chartered", "Private Banking market views", "https://www.sc.com/en/wealth-retail-banking/private-banking/latest-market-views/"],
+  ["UBS", "CIO House View", "https://www.ubs.com/global/en/wealthmanagement/insights/house-view.html"],
+  ["UniCredit", "Investment Institute", "https://www.the-investment-institute.unicredit.eu/"],
+  ["Syz Private Banking", "Market insights and outlooks", "https://blog.syzgroup.com/"],
+  ["Westpac", "Westpac IQ economics", "https://www.westpaciq.com.au/economics/"],
+];
 const RANGES = { "1M": 31, "3M": 92, "6M": 183, "1Y": 366, "2Y": 731, "5Y": 1827, "Max": 99999 };
 
 // ---------- theme
@@ -651,9 +720,9 @@ const ukTime = iso => {
   return day === today ? t : day + " " + t;
 };
 const SRC_LABEL = { prices_fx: "FX, gold & bitcoin", prices_us: "ETFs", fred: "FRED", boe: "Bank of England", cot: "CFTC",
-  calendar: "earnings & US dates", forexfactory: "Forex Factory", price_history: "price history", fundamentals: "economic data", policy: "central bank pricing" };
+  calendar: "earnings & US dates", forexfactory: "Forex Factory", price_history: "price history", fundamentals: "economic data", policy: "central bank pricing", research: "research feeds" };
 const SRC_EVERY = { prices_fx: "every 20 min on weekdays", prices_us: "every 20 min in US market hours", fred: "every 30 min", boe: "every 30 min",
-  cot: "every 10 min (new report weekly)", calendar: "hourly", forexfactory: "every 30 min", price_history: "daily", fundamentals: "every 6 hours", policy: "every 30 min" };
+  cot: "every 10 min (new report weekly)", calendar: "hourly", forexfactory: "every 30 min", price_history: "daily", fundamentals: "every 6 hours", policy: "every 30 min", research: "hourly" };
 function stampNode(srcs) {
   const st = D.status && D.status.sources || {};
   const box = el("div", "upd");
@@ -1114,11 +1183,37 @@ function drawRanges() {
   $("ranges").replaceChildren(...keys.map(k => { const b = el("button", "", k); b.type = "button"; b.setAttribute("aria-pressed", k === range); b.onclick = () => { range = k; drawRanges(); drawMain(); }; return b; }));
 }
 
+// ---------- research
+function drawResearch() {
+  const items = D.research && D.research.items || [];
+  const sources = ["All", ...new Set(items.map(i => i.source))];
+  if (!sources.includes(researchFilter)) researchFilter = "All";
+  $("rchips").replaceChildren(...sources.map(s => { const b = el("button", "", s); b.type = "button"; b.setAttribute("aria-pressed", s === researchFilter); b.onclick = () => { researchFilter = s; drawResearch(); }; return b; }), hq(HELP.rchips, "the source buttons"));
+  const ul = $("research"); ul.replaceChildren();
+  const shown = items.filter(i => researchFilter === "All" || i.source === researchFilter).slice(0, 60);
+  if (!shown.length) ul.append(el("li", "empty", "No research headlines yet. They arrive with the next refresh."));
+  shown.forEach(i => {
+    const li = el("li");
+    if (/^https:\/\//.test(i.link)) { const a = el("a", "", i.title); a.href = i.link; a.target = "_blank"; a.rel = "noopener noreferrer"; li.append(a); }
+    else li.append(el("span", "", i.title));
+    li.append(el("span", "meta", i.source + (i.published ? " · " + relTime(i.published) : "")));
+    ul.append(li);
+  });
+}
+function drawLibrary() {
+  $("library").replaceChildren(...LIBRARY.map(([name, what, url]) => {
+    const li = el("li"), a = el("a", "", name);
+    a.href = url; a.target = "_blank"; a.rel = "noopener noreferrer";
+    li.append(a, el("span", "meta", what));
+    return li;
+  }));
+}
+
 function renderAll() {
   hideTip();
   if (activeTab === "overlays") { drawHeader(); drawOverlay(); return; }
   if (activeTab === "fund") { drawHeader(); drawFund(); drawStamps(); return; }
-  drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawCot(); drawRates(); drawUK(); drawPolicy(); drawCalendar(); drawStamps(); drawCurve(); drawEcon();
+  drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawCot(); drawRates(); drawUK(); drawPolicy(); drawCalendar(); drawStamps(); drawCurve(); drawEcon(); drawResearch();
 }
 
 // ---------- tabs
@@ -1527,9 +1622,9 @@ async function getJSON(name) {
 }
 let fundAt = 0, fundSeen = null;
 async function load() {
-  const names = ["prices", "price_history", "fred", "cot", "boe", "calendar", "ff", "status", "policy"];
+  const names = ["prices", "price_history", "fred", "cot", "boe", "calendar", "ff", "status", "policy", "research"];
   const got = await Promise.all(names.map(n => getJSON(n + ".json")));
-  const keys = ["prices", "hist", "fred", "cot", "boe", "cal", "ff", "status", "policy"];
+  const keys = ["prices", "hist", "fred", "cot", "boe", "cal", "ff", "status", "policy", "research"];
   const next = {}; keys.forEach((k, i) => next[k] = got[i] || D[k]);
   // economic data is larger and changes a few times a day: re-read it every 30 minutes, or when its source changed
   const fst = next.status && next.status.sources && next.status.sources.fundamentals;
@@ -1544,6 +1639,7 @@ async function load() {
 }
 let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderAll, 150); });
 showTab(activeTab);
+drawLibrary();
 load();
 setInterval(load, 2 * 60 * 1000);
 })();

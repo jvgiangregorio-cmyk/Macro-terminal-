@@ -21,6 +21,7 @@ A personal markets dashboard (rates, FX, equities, commodities, economic data an
 | Bank of England expected Bank Rate path | Bank of England SONIA forward curve (no key) | every 30 min (published daily) |
 | Big-company earnings dates | Finnhub (`FINNHUB_API_KEY` secret) | hourly |
 | Later US release dates | FRED | hourly |
+| Research | Public research feeds: ING Think, Nordea, WSJ, Goldman Sachs podcast, Fed Beige Book, FactSet Insight (headlines and links only), plus a library of links to other banks' free research pages | hourly |
 | Fundamentals: GDP, inflation, jobs, wages, retail sales, confidence surveys, trade, policy rates and 10-year yields for USD, EUR, GBP, JPY, CHF, CAD, AUD and NZD since 2000 | FRED, ONS (via DBnomics), ECB, Statistics Bureau of Japan (via DBnomics), SNB, Statistics Canada, RBA, OECD and BIS; only FRED needs a key (see `scripts/fundamentals.py`) | every 6 hours |
 
 ## The API keys

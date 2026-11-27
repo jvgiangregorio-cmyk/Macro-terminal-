@@ -11,6 +11,7 @@ Sources
   Finnhub      earnings dates
   CFTC         Commitments of Traders futures positioning (no key needed)
   Forex Factory  this week's economic calendar (no key needed)
+  Research     headlines from free public bank research feeds (no key needed)
   Kalshi       market odds for each Fed meeting (no key needed)
   BoE curve    SONIA forward curve, turned into an expected Bank Rate path
   Fundamentals  economic indicators for the eight major currencies from FRED, ONS,
@@ -42,6 +43,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 DATA = Path(__file__).resolve().parent.parent / "docs" / "data"
@@ -78,6 +80,7 @@ SCHEDULE = {
     "boe": 30,
     "cot": 10,            # quick "is there a new report?" check
     "calendar": 60,       # earnings dates + US release dates
+    "research": 60,       # bank research feeds publish a few times a day at most
     "forexfactory": 30,   # Forex Factory asks people not to poll it often
     "policy": 30,         # Fed odds (Kalshi) and the BoE's SONIA curve (daily)
     "fundamentals": 360,  # official economic statistics (scripts/fundamentals.py), ~55 requests
@@ -172,6 +175,21 @@ EARNINGS_WATCH = {
     "BAC", "WFC", "GS", "MS", "C", "KO", "PEP", "MCD", "NKE", "DIS", "INTC", "CSCO", "CVX", "CAT",
     "BA", "IBM", "QCOM", "TXN", "MU", "PLTR", "UBER", "FDX", "TGT", "LOW", "SBUX",
 }
+
+# Free, public research feeds. We keep headlines and links only: the reports
+# stay on the publishers' sites (this page is public, so no copies of reports).
+# (name, feed URL, only keep items whose title contains this, lower case)
+RESEARCH_FEEDS = [
+    ("ING Think", "https://think.ing.com/rss/", None),
+    ("Nordea", "https://www.nordea.com/en/data_export/articles_xml/275", None),
+    ("WSJ Markets", "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain", None),
+    ("WSJ Economy", "https://feeds.content.dowjones.io/public/rss/socialeconomyfeed", None),
+    ("Goldman Sachs podcast", "https://feeds.megaphone.fm/GLD9322922848", None),
+    ("Fed Beige Book", "https://www.federalreserve.gov/feeds/press_all.xml", "beige book"),
+    ("FactSet Insight", "https://insight.factset.com/rss.xml", None),
+]
+RESEARCH_PER_SOURCE = 12
+RESEARCH_KEEP_DAYS = 120   # long enough to keep the last Beige Book (8 a year)
 
 FF_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 FF_CURRENCIES = {"USD", "GBP", "EUR", "JPY", "CNY", "CAD", "AUD", "CHF", "NZD"}
@@ -914,6 +932,72 @@ def parse_date(s):
     return iso(t.astimezone(dt.timezone.utc))
 
 
+# ---------------------------------------------------------------- research
+
+
+def text_of(el, *names):
+    for n in names:
+        found = el.find(n)
+        if found is not None:
+            if found.text and found.text.strip():
+                return found.text.strip()
+            if found.get("href"):
+                return found.get("href")
+    return ""
+
+
+def fetch_research():
+    """Latest research headlines. Older items are kept (up to RESEARCH_KEEP_DAYS),
+    so a source that publishes rarely, like the Beige Book, doesn't vanish."""
+    print("Research")
+    atom = "{http://www.w3.org/2005/Atom}"
+    old = (load("research.json") or {}).get("items", [])
+    fresh, errors, ok_sources = [], [], set()
+    for source, url, must in RESEARCH_FEEDS:
+        try:
+            root = ET.fromstring(get(url))
+            channel_link = text_of(root.find("channel") if root.find("channel") is not None else root, "link", f"{atom}link")
+            entries = root.findall(".//item") or root.findall(f".//{atom}entry")
+            n = 0
+            for e in entries:
+                title = text_of(e, "title", f"{atom}title")
+                if must and must not in title.lower():
+                    continue
+                link = text_of(e, "link", f"{atom}link")
+                if not link.startswith("https://"):   # podcasts often have no page per episode
+                    link = channel_link
+                when = parse_date(text_of(e, "pubDate", f"{atom}updated", f"{atom}published",
+                                          "{http://purl.org/dc/elements/1.1/}date"))
+                if title and link.startswith("https://"):
+                    fresh.append({"source": source, "title": title, "link": link, "published": when})
+                    n += 1
+                if n >= RESEARCH_PER_SOURCE:
+                    break
+            ok_sources.add(source)
+            print(f"  {source}: {n} items")
+        except Exception as e:  # noqa: BLE001
+            print(f"  {source} failed: {e}")
+            errors.append(f"{source}: {str(e)[:120]}")
+    if not ok_sources:
+        raise RuntimeError("no research feed could be read")
+    cutoff = iso(now_utc() - dt.timedelta(days=RESEARCH_KEEP_DAYS))
+    names = {name for name, _, _ in RESEARCH_FEEDS}
+    items, seen = [], set()
+    for i in fresh + old:   # fresh first, so updated titles win
+        key = (i["source"], i["link"], i["title"].lower()[:80])
+        if i["source"] not in names or key in seen or (i.get("published") or "9") < cutoff:
+            continue
+        seen.add(key)
+        items.append(i)
+    items.sort(key=lambda i: i["published"] or "", reverse=True)
+    per, kept = {}, []
+    for i in items:
+        per[i["source"]] = per.get(i["source"], 0) + 1
+        if per[i["source"]] <= RESEARCH_PER_SOURCE or i["source"] == "Fed Beige Book":
+            kept.append(i)
+    return save("research.json", {"updated": iso(now_utc()), "errors": errors, "items": kept})
+
+
 # ---------------------------------------------------------------- Fundamentals
 
 
@@ -984,8 +1068,11 @@ def main():
     if due("fundamentals", force) or load("fundamentals.json") is None:
         run_source("fundamentals", fetch_fundamentals, fred_key)
 
+    if due("research", force) or load("research.json") is None:
+        run_source("research", fetch_research)
+
     # Sources that were removed from the terminal: drop their old files and status.
-    for gone in ("news", "finnhub_news", "research"):
+    for gone in ("news", "finnhub_news"):
         STATUS.pop(gone, None)
         (DATA / f"{gone}.json").unlink(missing_ok=True)
 
