@@ -21,6 +21,7 @@ import json
 import math
 from pathlib import Path
 
+ALWAYS_OPEN = {"BTC/USD"}  # trades every day, so its weekend prices are real
 DATA = Path(__file__).resolve().parent.parent / "docs" / "data"
 
 # FRED / Bank of England series to scan: (id, display name, group, how to measure a move)
@@ -111,15 +112,20 @@ def universe():
     except ImportError:
         TD_SYMBOLS = [(s, q.get("name", s), q.get("group", "")) for s, q in quotes.items()]
     for sym, name, group in TD_SYMBOLS:
-        pts = [p for p in hist.get(sym, []) if p[1] is not None]
+        # Weekend bars (currencies, gold) are dropped: the market is shut, and keeping them would turn
+        # the "200-day average" into ~140 trading days and make normal daily swings look smaller.
+        keep = lambda day: sym in ALWAYS_OPEN or dt.date.fromisoformat(day[:10]).weekday() < 5
+        pts = [p for p in hist.get(sym, []) if p[1] is not None and keep(p[0])]
         q = quotes.get(sym)
         # add the latest live quote, like the page does, so "today" is today
-        if q and q.get("price") is not None and q.get("as_of"):
+        if q and q.get("price") is not None and q.get("as_of") and keep(q["as_of"]):
             day = q["as_of"][:10]
             if pts and pts[-1][0] == day:
                 pts[-1] = [day, q["price"]]
             elif not pts or pts[-1][0] < day:
                 pts.append([day, q["price"]])
+        if "/" in sym and group == "FX":
+            name = sym  # "USD/JPY", not "Japanese yen": USD/JPY rising means the yen is falling
         if len(pts) > 30:
             out[sym] = {"name": name, "group": group, "kind": "pct", "src": "td", "pts": pts}
     for fname, table in (("fred.json", FRED_SCAN), ("boe.json", BOE_SCAN)):
@@ -170,8 +176,19 @@ def scan_market(key, m):
                 events.append({"date": pts[i][0], "type": "up200" if p1 > a1 else "down200"})
             if (f0 - a0) * (f1 - a1) < 0:
                 events.append({"date": pts[i][0], "type": "golden" if f1 > a1 else "death"})
-        if events:
-            row["crosses"] = events
+        # keep only the latest cross of each kind, and only if it still holds today
+        # (a market that dipped under its 200-day and climbed back is not "below its 200-day")
+        held = []
+        for kind_ in (("up200", "down200"), ("golden", "death")):
+            last = [e for e in events if e["type"] in kind_][-1:]
+            if last:
+                e = last[0]
+                ok = {"up200": levels[-1] > m200, "down200": levels[-1] < m200,
+                      "golden": m50 > m200, "death": m50 < m200}[e["type"]]
+                if ok:
+                    held.append(e)
+        if held:
+            row["crosses"] = sorted(held, key=lambda e: e["date"])
     # --- trend strength: move over n days divided by what a normal n-day move is
     yr = [x for _, x in mv[-250:]]
     dsd = sd(yr)

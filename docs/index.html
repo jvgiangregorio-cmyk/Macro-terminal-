@@ -471,7 +471,7 @@ const HELP = {
   scanAlerts: "A short list of everything the scanner's rules flagged: unusually big moves, markets crossing their 200-day average, positioning at a 3-year extreme, and pairs of markets that stopped behaving the way they usually do. These are simple rules on the data already on this page, not predictions. Click an alert to chart that market.",
   scanMoves: "How big each market's latest move was compared with its normal day. 'Size' divides the move by the typical daily move over the last 60 days (a z-score): 1 is an ordinary day, 2 or more is unusual (about 1 day in 20), 3 or more is rare. 'Week' does the same for the last 5 days. Prices are in %, yields and credit spreads in basis points (bp, hundredths of a percentage point).",
   scanTrend: "Ranks every market by how strongly it has trended over 1 week, 1 month and 3 months. Each move is divided by what a normal move over that many days would be for that market, so a quiet market like EUR/USD and a jumpy one like bitcoin can be compared fairly. Above +1 is a clear uptrend, below −1 a clear downtrend. 'Score' is the average of the three (or the one period you picked).",
-  scanMA: "A moving average is the average price over the last 50 or 200 trading days. Many traders treat being above or below the 200-day average as a simple trend test. 'vs 200d' is how far the price is from it. 'Recent' shows a cross in the last 10 trading days, including a 'golden cross' (50-day average rising above the 200-day) and a 'death cross' (falling below).",
+  scanMA: "A moving average is the average closing price over the last 50 or 200 trading days (weekends left out, except for bitcoin). Many traders treat being above or below the 200-day average as a simple trend test. 'vs 200d' is how far the price is from it. Currencies are shown as pairs: USD/JPY above its average means the dollar is strong against the yen. 'Recent' shows a cross in the last 10 trading days that still holds today, including a 'golden cross' (50-day average rising above the 200-day) and a 'death cross' (falling below).",
   scanCot: "Where hedge funds' net futures position sits within its own 3-year range (the 'COT index'): 0 is the most short they have been in 3 years, 100 the most long. 90 or more, or 10 or less, is marked as stretched, because crowded positions can unwind sharply. Uses leveraged funds (managed money for commodities) where the CFTC reports them ('funds'), otherwise large speculators ('specs'). Updated weekly.",
   scanCorr: "Correlation shows how often two markets move the same way on the same day, from +1 (always together) through 0 (no link) to −1 (always opposite). Blue cells move together, red cells move opposite. Switch between the last 3 months and the last year. Currencies close at midnight UK time and US ETFs at the New York close, so their daily links are slightly blurred. FRED series (yields, VIX, dollar index, HY spread) are usually a day behind.",
   scanBreaks: "Pairs of markets that usually move together (or opposite) over the past year but not now. 'This month' means the last 21 trading days ran against the usual link. 'Today' means both markets made a sizeable move the opposite way to usual on the same day. A break can just be noise, but it is often worth a look.",
@@ -1398,6 +1398,8 @@ function tdPoints(sym) {
   return pts;
 }
 // Every series the terminal collects, as one catalogue: key -> {name, group, pts, fmt, freq, src}
+// Fundamentals series that are monthly averages of a daily series this page also collects
+const FUND_DAILY = { "USD.y10": "DGS10", "GBP.y10": "IUDMNPY" };
 function ovCatalogue() {
   const cat = {};
   allQuotes().forEach(q => {
@@ -1412,8 +1414,11 @@ function ovCatalogue() {
       freq: id === "GDPC1" ? "quarterly" : monthly ? "monthly" : ["ICSA", "MORTGAGE30US"].includes(id) ? "weekly" : "daily", src: k };
   }));
   Object.values(fundItems()).forEach(i => {
+    // a monthly average lags by up to a month: where the daily series is collected, use it from its first day on
+    const dly = FUND_DAILY[i.id] && fredSeries(FUND_DAILY[i.id]), dobs = dly && dly.obs || [];
+    const pts = dobs.length ? () => i.pts.filter(p => p[0] < dobs[0][0]).concat(dobs) : () => i.pts;
     cat["fund:" + i.id] = { name: i.country + ": " + i.name, short: i.cur + " " + i.name, group: "Fundamentals · " + i.cur + " " + i.country,
-      pts: () => i.pts, fmt: v => fundFmt(i, v), freq: FREQ_LABEL[i.freq] || "monthly", src: "fundamentals",
+      pts, fmt: v => fundFmt(i, v), freq: dobs.length ? "daily" : FREQ_LABEL[i.freq] || "monthly", src: dobs.length ? (D.boe && D.boe.series[FUND_DAILY[i.id]] ? "boe" : "fred") : "fundamentals",
       chg: i.unit === "%" ? "pp" : /change/i.test(i.name) ? "diff" : "pct", alias: CUR_ALIAS[i.cur] || "" };
   });
   (D.cot && D.cot.markets || []).forEach(m => {
@@ -1799,8 +1804,9 @@ function scanAlerts(S) {
       text: m.name + " moved " + scanUnit(m.kind, m.chg1) + " on the day, " + fmt(Math.abs(m.z1), 1) + "× its normal daily swing." });
     else if (m.z5 != null && Math.abs(m.z5) >= 2) out.push({ m, tag: "Big week", score: Math.abs(m.z5), when: m.date,
       text: m.name + " is " + scanUnit(m.kind, m.chg5) + " over 5 days, " + fmt(Math.abs(m.z5), 1) + "× a normal week." });
-    (m.crosses || []).slice(-1).forEach(c => out.push({ m, tag: c.type === "golden" ? "Golden x" : c.type === "death" ? "Death x" : "200-day", score: 1.5, when: c.date,
-      text: c.type === "up200" ? m.name + " crossed above its 200-day average." : c.type === "down200" ? m.name + " fell below its 200-day average." :
+    const now = m.vs200 == null ? "" : " It is now " + scanUnit(m.kind, Math.abs(m.vs200), 1).replace("+", "") + (m.vs200 >= 0 ? " above" : " below") + " it.";
+    (m.crosses || []).forEach(c => out.push({ m, tag: c.type === "golden" ? "Golden x" : c.type === "death" ? "Death x" : "200-day", score: 1.5, when: c.date,
+      text: c.type === "up200" ? m.name + " closed above its 200-day average on " + scanDay(c.date) + "." + now : c.type === "down200" ? m.name + " closed below its 200-day average on " + scanDay(c.date) + "." + now :
         c.type === "golden" ? m.name + ": 50-day average crossed above the 200-day (golden cross)." : m.name + ": 50-day average fell below the 200-day (death cross)." }));
   });
   (S.cot || []).filter(c => c.flag).forEach(c => out.push({ m: c, tag: "Crowded", score: 1.2 + Math.abs(c.index - 50) / 100, when: c.date,

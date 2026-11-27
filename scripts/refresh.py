@@ -372,9 +372,19 @@ def fetch_prices(key, syms):
     return save("prices.json", {"updated": iso(now_utc()), "errors": errors, "quotes": quotes})
 
 
+ALWAYS_OPEN = {"BTC/USD"}   # trades every day, so weekend bars are real
+
+
+def is_weekend(day):
+    return dt.date.fromisoformat(day[:10]).weekday() >= 5
+
+
 def fetch_price_history(key):
     print("Twelve Data daily history")
-    raw, errors = td_batches("time_series", key, interval="1day", outputsize=HISTORY_DAYS)
+    # Twelve Data also sends Saturday and Sunday bars for currencies and gold. Markets are shut then,
+    # so they are dropped (they would make a "200-day average" cover only ~140 trading days).
+    # Asking for more rows costs nothing extra: each symbol is one call whatever the size.
+    raw, errors = td_batches("time_series", key, interval="1day", outputsize=HISTORY_DAYS * 7 // 5 + 10)
     old = (load("price_history.json") or {}).get("series", {})
     series = {}
     for sym, _, _ in TD_SYMBOLS:
@@ -382,7 +392,8 @@ def fetch_price_history(key):
         vals = r.get("values")
         if vals:
             pts = [[v["datetime"][:10], num(v["close"])] for v in reversed(vals)]
-            series[sym] = [p for p in pts if p[1] is not None]
+            pts = [p for p in pts if p[1] is not None and (sym in ALWAYS_OPEN or not is_weekend(p[0]))]
+            series[sym] = pts[-HISTORY_DAYS:]
         elif sym in old:
             series[sym] = old[sym]
     if not series:
