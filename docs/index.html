@@ -197,15 +197,27 @@ tr.fund-detail > td{padding:8px 4px 14px;text-align:left;white-space:normal}
 .tile .p{font-size:11.5px;color:var(--faint)}
 .empty{color:var(--faint);font-size:13px;padding:8px 0}
 footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
+.hq{display:inline-flex;align-items:center;justify-content:center;position:relative;width:15px;height:15px;margin-left:5px;border:1px solid var(--line);border-radius:50%;font:600 10px/1 "IBM Plex Sans",system-ui,sans-serif;color:var(--faint);background:var(--panel);cursor:help;vertical-align:1px;flex:none;letter-spacing:0;text-transform:none;user-select:none}
+.hq::after{content:"";position:absolute;inset:-7px}
+.hq:hover,.hq[aria-expanded="true"]{color:var(--accent);border-color:var(--accent)}
+.hq:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.panel h2 .hq{margin-right:auto}
+th .hq{margin-left:3px}
+.rg-wrap{margin-left:auto;display:flex;align-items:center}.rg-wrap .ranges{margin-left:0}.ov-controls>span[data-help]{margin-left:-12px}.stamp+span[data-help]{margin-left:-16px}
+@media (max-width:640px){.panel{overflow-x:auto}}
+@media (max-width:520px){#cot th:nth-child(6),#cot td:nth-child(6){display:none}}
+.fund-tabs-row{display:flex;align-items:center;gap:6px;margin:0 0 12px}.fund-tabs-row .subtabs{margin:0}
+.help-pop{position:fixed;display:none;z-index:20;max-width:min(300px,calc(100vw - 16px));background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 11px;font:12.5px/1.45 "IBM Plex Sans",system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.16);white-space:normal;text-align:left}
+.ov-legend-help{flex-basis:100%;color:var(--faint);font:12px "IBM Plex Sans",system-ui,sans-serif}
 @media (max-width:1100px){.grid{grid-template-columns:1fr}}
-@media (max-width:520px){.chart{height:240px}.ranges{margin-left:0}.hdr-right{margin-left:0}}
+@media (max-width:520px){.chart{height:240px}.ranges,.rg-wrap{margin-left:0}.hdr-right{margin-left:0}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <h1>Macro Terminal</h1>
-    <div class="stamp" id="stamps">Loading data…</div>
+    <div class="stamp" id="stamps">Loading data…</div><span data-help="stamp"></span>
     <div class="hdr-right">
       <button id="themeBtn" type="button" title="Switch light or dark">◐ Theme</button>
     </div>
@@ -222,12 +234,12 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
   <div class="grid">
     <div class="col">
       <section class="panel" aria-label="Selected chart">
-        <h2>Chart <span>click any row or tile on the page</span></h2>
+        <h2 data-help="chart">Chart <span>click any row or tile on the page</span></h2>
         <div class="main-head">
           <div class="main-title" id="mainTitle">—</div>
           <div class="main-val" id="mainVal"></div>
           <div class="chg" id="mainChg"></div>
-          <div class="ranges" id="ranges" role="group" aria-label="Time range"></div>
+          <div class="rg-wrap"><div class="ranges" id="ranges" role="group" aria-label="Time range"></div><span data-help="ranges"></span></div>
         </div>
         <div class="upd" id="mainUpd"></div>
         <div class="chart" id="mainChart" tabindex="0" aria-label="Price chart. Use left and right arrow keys to read values."></div>
@@ -237,14 +249,14 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
       <div class="markets" id="markets"></div>
 
       <section class="panel">
-        <h2>Futures positioning (CFTC COT) <span id="cotAsOf"></span></h2>
+        <h2 data-help="cot">Futures positioning (CFTC COT) <span id="cotAsOf"></span></h2>
         <div class="upd" data-src="cot"></div>
         <p class="note">Speculators' net position in futures: contracts betting on a rise minus contracts betting on a fall. Positive means they lean long. "vs 3Y" shows where today sits between the lowest (left) and highest (right) net position of the last three years. Click a row for 10 years of history.</p>
         <table id="cot"></table>
       </section>
 
       <section class="panel">
-        <h2>Economy <span>click a tile to chart it</span></h2>
+        <h2 data-help="econ">Economy <span>click a tile to chart it</span></h2>
         <div class="upd" data-src="fred"></div>
         <div class="tiles" id="econ"></div>
       </section>
@@ -252,26 +264,26 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
 
     <div class="col">
       <section class="panel">
-        <h2>US Treasury yield curve <span id="curveAsOf"></span></h2>
+        <h2 data-help="curve">US Treasury yield curve <span id="curveAsOf"></span></h2>
         <div class="upd" data-src="fred"></div>
         <div class="chart" id="curveChart" style="height:210px" tabindex="0" aria-label="Yield curve chart"></div>
         <div class="legend" id="curveLegend"></div>
       </section>
 
       <section class="panel">
-        <h2>Rates &amp; credit <span>daily change</span></h2>
+        <h2 data-help="rates">Rates &amp; credit <span>daily change</span></h2>
         <div class="upd" data-src="fred"></div>
         <table id="rates"></table>
       </section>
 
       <section class="panel">
-        <h2>UK rates &amp; sterling <span>Bank of England</span></h2>
+        <h2 data-help="uk">UK rates &amp; sterling <span>Bank of England</span></h2>
         <div class="upd" data-src="boe"></div>
         <table id="ukrates"></table>
       </section>
 
       <section class="panel">
-        <h2>Coming up <span id="calAsOf"></span></h2>
+        <h2 data-help="cal">Coming up <span id="calAsOf"></span></h2>
         <div class="upd" data-src="forexfactory,calendar"></div>
         <div id="calendar"></div>
       </section>
@@ -281,7 +293,7 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
   </div>
 
   <div id="tab-fund" role="tabpanel" aria-labelledby="tabbtn-fund" hidden>
-    <nav class="subtabs" id="fundTabs" role="tablist" aria-label="Currencies"></nav>
+    <div class="fund-tabs-row"><nav class="subtabs" id="fundTabs" role="tablist" aria-label="Currencies"></nav><span data-help="fundTabs"></span></div>
     <div class="fund-head">
       <div class="fund-title" id="fundTitle"></div>
       <div class="upd" data-src="fundamentals"></div>
@@ -293,23 +305,23 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
   <div id="tab-overlays" role="tabpanel" aria-labelledby="tabbtn-overlays" hidden>
     <section class="panel ov-panel">
       <div class="ov-controls">
-        <label class="ov-field">Add a series
+        <label class="ov-field" data-help="ovAdd">Add a series
           <select id="ovAdd"></select>
         </label>
         <div class="ov-search">
           <input type="search" id="ovSearch" placeholder="Search, e.g. UK retail" aria-label="Search all series" autocomplete="off" aria-controls="ovResults" aria-expanded="false">
           <div class="ov-results" id="ovResults" role="listbox" aria-label="Matching series" hidden></div>
-        </div>
+        </div><span data-help="ovSearch"></span>
         <div class="ov-group" role="group" aria-label="Scale">
           <button type="button" data-mode="dual">Own scales</button>
           <button type="button" data-mode="rebased">Rebased to 100</button>
-        </div>
-        <div class="ranges" id="ovRanges" role="group" aria-label="Time range"></div>
+        </div><span data-help="ovMode"></span>
+        <div class="ranges" id="ovRanges" role="group" aria-label="Time range"></div><span data-help="ovRanges"></span>
       </div>
       <div class="ov-chart" id="ovChart" tabindex="0" aria-label="Overlay chart. Use left and right arrow keys to read values."></div>
       <div class="ov-legend" id="ovLegend"></div>
       <details class="ov-events">
-        <summary>Event markers</summary>
+        <summary data-help="ovEvents">Event markers</summary>
         <form id="ovEventForm" class="ov-event-form">
           <input type="date" id="ovEventDate" required aria-label="Event date">
           <input type="text" id="ovEventLabel" required maxlength="40" placeholder="Label, e.g. Fed cut" aria-label="Event label">
@@ -338,6 +350,242 @@ const SVGNS = "http://www.w3.org/2000/svg";
 const sv = (tag, attrs) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); return e; };
 
 let D = { prices: null, hist: null, fred: null, cot: null, boe: null, cal: null, ff: null, status: null, fund: null };
+
+// ---------- "?" help buttons: hover on a computer, tap or click on a phone
+const HELP = {
+  // panels
+  chart: "The big chart shows whatever you last clicked on the page: a price, a rate, an economic tile or a futures row. Hover (or tap) the line to read values, and use the buttons on the right to change the time span.",
+  ranges: "How much history the chart shows, from one month (1M) to everything available (Max).",
+  stamp: "When the data was last checked. Each source has its own timer (shown under each panel) and this page re-reads the data every 2 minutes, so you never need to reload.",
+  Equities: "Prices of exchange-traded funds (ETFs), which are baskets of shares you can buy like one stock. They track the big stock market indexes. They update every 20 minutes while the US market is open.",
+  FX: "Exchange rates. EUR/USD means how many US dollars one euro buys. Rising means the first currency is getting stronger. They update every 20 minutes on weekdays.",
+  Commodities: "Gold, silver, oil and bitcoin. Silver and oil are shown through ETFs because their direct prices are not on the free data plan.",
+  fxToggle: "Dollar pairs are the rates against the US dollar that are downloaded. Crosses are pairs without the dollar, like EUR/GBP, worked out by dividing two dollar pairs.",
+  cot: "Every week the US regulator (the CFTC) publishes how big speculators, mainly hedge funds, are positioned in futures. It shows whether the crowd is betting on prices going up or down.",
+  econ: "Headline US economic figures from FRED (the St. Louis Fed's free database). Click a tile to see its history in the big chart.",
+  curve: "The interest rate the US government pays to borrow for different lengths of time, from 3 months to 30 years. Normally longer loans pay more; when short rates are above long rates the curve is 'inverted', which has often come before recessions.",
+  rates: "US interest rates, credit spreads and key market gauges from FRED. 'Chg' is the change from the day before.",
+  uk: "UK interest rates and the pound, from the Bank of England's own database. It is usually one working day behind.",
+  cal: "Economic data releases and big company results coming up, so you know what could move markets. Times are UK time.",
+  ff: "This week's economic releases from Forex Factory. HIGH marks the ones that usually move markets most, such as jobs reports, inflation and central bank decisions.",
+  earn: "When big US companies report their quarterly results. EPS est. is what analysts expect the company to earn per share.",
+  // table columns
+  Last: "The latest price.",
+  Today: "How much the price has moved since yesterday's close, in percent.",
+  "1Y": "A small line showing the last year, so you can see the trend at a glance.",
+  Latest: "The most recent reading.",
+  Chg: "Change from the previous reading. Rates are shown in basis points (bp): 100 bp = 1 percentage point.",
+  Net: "Speculators' long contracts (bets on a rise) minus short contracts (bets on a fall). Positive means they lean bullish. 'k' means thousands of contracts.",
+  Week: "How much the net position changed in the last week.",
+  "% of OI": "The net position as a share of open interest (all contracts that exist in that market). It makes big and small markets comparable.",
+  "vs 3Y": "Where today's net position sits in its range of the last three years: far left is the most bearish, far right the most bullish. Extremes can mean a crowded trade.",
+  "3Y": "The net position over the last three years.",
+  Actual: "The figure that was released. Forex Factory's free feed doesn't include it, so it stays blank here.",
+  Fcst: "What economists expect the figure to be. Markets move when the actual number is far from this.",
+  Prior: "The previous reading, for comparison.",
+  When: "The report date. Pre-open means before the US market opens; after close means after 4 pm New York time.",
+  "EPS est.": "Earnings per share that analysts expect: the company's profit divided by its number of shares.",
+  Indicator: "The economic figure, with its source and how often it comes out underneath.",
+  Period: "The month or quarter the latest reading covers. Figures are released a few weeks after the period ends.",
+  "5 years": "A small line of the last five years of readings.",
+  Value: "The reading for that period.",
+  Change: "The difference from the reading before. For percentages this is in percentage points (pp).",
+  // fundamentals
+  fundTabs: "Pick a currency to see its country's economic data. These are the figures that drive interest rates, and interest rates drive currencies.",
+  Growth: "How fast the economy is growing: GDP, factory output and leading indicators.",
+  Inflation: "How fast prices are rising. Central banks usually aim for about 2% a year and raise interest rates when inflation runs above that.",
+  Labour: "Jobs and wages. A tight jobs market with fast wage growth tends to keep inflation and interest rates up.",
+  Consumer: "What households are spending and how confident they feel. Consumer spending is the biggest part of most economies.",
+  Business: "Surveys of how businesses see things. They come out early, so they often hint at where growth is heading.",
+  Trade: "Exports, imports and the gap between them. Strong exports bring in demand for the currency.",
+  Rates: "The central bank's interest rate and the 10-year government bond yield. Higher rates usually make a currency more attractive.",
+  // overlays
+  ovAdd: "Pick a series from the full list to add it to the chart. You can show up to 6 at once.",
+  ovSearch: "Type to find any series, for example 'uk retail', 'japan cpi' or 'eur/jpy'. Use the arrow keys and Enter, or click a result.",
+  ovMode: "Own scales gives each line its own axis so you can compare shapes. Rebased to 100 starts every line at 100, so you can compare percentage moves directly.",
+  ovRanges: "How much history to show on the overlay chart.",
+  ovEvents: "Add your own dated markers, such as a central bank decision, to see how the lines reacted around it. They are saved in this browser only.",
+  ovLegend: "Each line shows the latest value, how often it updates (● LIVE means it refreshed in the last 40 minutes) and its change over the chosen range (pp = percentage points, bp = basis points). 'Make primary' puts that series on the left axis.",
+  corr: "Correlation (r) with the primary series over the chosen range: +1 means they move together, −1 means they move in opposite directions, and 0 means no link.",
+};
+const HELP_SYM = {
+  SPY: "Tracks the S&P 500, the 500 biggest US companies. The usual benchmark for 'the US stock market'.",
+  QQQ: "Tracks the Nasdaq 100, the 100 biggest non-financial companies on the Nasdaq. Heavy in tech.",
+  DIA: "Tracks the Dow Jones Industrial Average, 30 large US companies. The oldest US index.",
+  IWM: "Tracks the Russell 2000, small US companies. They are more sensitive to US growth and interest rates.",
+  EFA: "Tracks big companies in developed markets outside the US and Canada, such as Europe, Japan and Australia.",
+  EEM: "Tracks big companies in emerging markets, such as China, India, Taiwan and Brazil.",
+  "USD/CNY": "How many Chinese yuan one US dollar buys. China's central bank keeps this rate within a set band, so it moves less than other currencies.",
+  "XAU/USD": "The price of one ounce of gold in US dollars. Gold often rises when people are nervous or when real interest rates fall.",
+  SLV: "An ETF that holds physical silver, so it moves with the silver price.",
+  USO: "An ETF that holds oil futures, so it roughly follows the US (WTI) crude oil price.",
+  "BTC/USD": "The price of one bitcoin in US dollars. It trades every day, including weekends.",
+};
+const HELP_FRED = {
+  DFF: "The Fed funds rate: the overnight rate US banks charge each other, steered by the Federal Reserve. It is the main US policy interest rate.",
+  SOFR: "The Secured Overnight Financing Rate: the cost of borrowing cash overnight against US government bonds. It replaced LIBOR as the main US benchmark rate.",
+  DGS3MO: "The yield on 3-month US Treasury bills. It mostly tracks where the Fed's rate is expected to be over the next few months.",
+  DGS2: "The 2-year US Treasury yield. It is the most sensitive bond yield to expected Fed rate moves.",
+  DGS5: "The 5-year US Treasury yield.",
+  DGS10: "The 10-year US Treasury yield. It is the benchmark for mortgages and long-term borrowing worldwide.",
+  DGS30: "The 30-year US Treasury yield, the longest the US government borrows for.",
+  T10Y2Y: "The 10-year yield minus the 2-year yield. When it is negative the curve is 'inverted', which has often come before US recessions.",
+  DFII10: "The 10-year real yield: the return on inflation-protected bonds (TIPS) after inflation. Rising real yields tend to weigh on gold and tech shares.",
+  T10YIE: "The 10-year breakeven: the inflation rate bond markets expect on average over the next 10 years.",
+  MORTGAGE30US: "The average 30-year fixed mortgage rate in the US, from Freddie Mac's weekly survey.",
+  BAMLC0A0CM: "How much more interest investment-grade (safer) companies pay than the US government. Wider spreads mean investors are more worried.",
+  BAMLH0A0HYM2: "How much more interest high-yield ('junk') companies pay than the US government. It jumps when markets fear defaults.",
+  VIXCLS: "The VIX, often called the fear gauge: how much the S&P 500 is expected to swing over the next month. Above about 30 means markets are stressed.",
+  DTWEXBGS: "The US dollar against a basket of the currencies of its main trading partners. Rising means a stronger dollar.",
+  DCOILWTICO: "The price of a barrel of West Texas Intermediate, the main US crude oil benchmark.",
+  DCOILBRENTEU: "The price of a barrel of Brent, the main international crude oil benchmark.",
+  DHHNGSP: "The US natural gas price at the Henry Hub in Louisiana, in dollars per million BTU.",
+  CPIAUCSL: "The Consumer Price Index: how much a typical basket of goods and services costs. Shown as the change from a year earlier, i.e. inflation.",
+  CPILFESL: "Core CPI: inflation without food and energy, whose prices jump around a lot. It shows the underlying trend better.",
+  PCEPILFE: "Core PCE prices: the inflation measure the Federal Reserve targets (2%). It excludes food and energy.",
+  UNRATE: "The share of people who want a job but don't have one.",
+  PAYEMS: "Nonfarm payrolls: how many jobs US employers added last month. Released on the first Friday of the month and one of the biggest market movers.",
+  ICSA: "Initial jobless claims: how many people applied for unemployment benefit last week. A rising trend is an early sign of job losses.",
+  GDPC1: "Real GDP: the total output of the US economy after inflation, shown as the annualised growth rate for the quarter.",
+  IUDBEDR: "Bank Rate: the interest rate set by the Bank of England. It drives UK mortgage and savings rates.",
+  IUDSOIA: "SONIA: the overnight rate UK banks pay to borrow from each other. It sits very close to Bank Rate.",
+  IUDSNPY: "The yield on a 5-year UK government bond (gilt).",
+  IUDMNPY: "The yield on a 10-year UK government bond (gilt), the UK's benchmark long-term rate.",
+  IUDLNPY: "The yield on a 20-year UK government bond (gilt).",
+  XUDLUSS: "How many US dollars one pound buys (GBP/USD), at the Bank of England's daily fixing.",
+  XUDLERS: "How many euros one pound buys (GBP/EUR), at the Bank of England's daily fixing.",
+  XUDLBK67: "The pound against a basket of the UK's main trading partners' currencies. Rising means a stronger pound overall.",
+};
+const HELP_COT = {
+  "2-year T-note": "Futures on 2-year US government bonds. Net short means speculators bet on higher short-term rates (bond prices fall when yields rise).",
+  "5-year T-note": "Futures on 5-year US government bonds. Net short means speculators bet on higher yields.",
+  "10-year T-note": "Futures on 10-year US government bonds. Net short means speculators bet on higher yields.",
+  "Treasury bond": "Futures on long-dated (about 15 to 25 year) US government bonds.",
+  "3-month SOFR": "Futures that pay off depending on where the US overnight rate (SOFR) will be. Net long means speculators bet on rate cuts.",
+  "S&P 500 e-mini": "Futures on the S&P 500 stock index.",
+  "Nasdaq 100 e-mini": "Futures on the Nasdaq 100 stock index, which is heavy in tech.",
+  "Dow e-mini": "Futures on the Dow Jones Industrial Average.",
+  VIX: "Futures on the VIX volatility index. Net short means speculators are betting markets stay calm.",
+  "US dollar index": "Futures on the dollar against six major currencies (mostly the euro). Net long means a bet on a stronger dollar.",
+  Euro: "Futures on the euro against the dollar. Net long means a bet that the euro rises.",
+  "Japanese yen": "Futures on the yen against the dollar. Net long means a bet that the yen strengthens.",
+  "British pound": "Futures on the pound against the dollar. Net long means a bet that the pound rises.",
+  "Australian dollar": "Futures on the Australian dollar against the US dollar.",
+  "Canadian dollar": "Futures on the Canadian dollar against the US dollar.",
+  Gold: "Gold futures on the COMEX exchange.", Silver: "Silver futures on the COMEX exchange.",
+  "WTI crude oil": "US crude oil futures on NYMEX, the most traded oil contract.",
+  Copper: "Copper futures. Copper is used across industry, so it is often read as a gauge of global growth.",
+  "Natural gas": "US natural gas futures (Henry Hub).", Bitcoin: "Bitcoin futures on the CME exchange.",
+};
+const HELP_FUND = {
+  gdp: "Gross domestic product: the total value of everything the economy produces, after inflation. Shown as the quarter's growth scaled up to a yearly pace.",
+  gdp_q: "Gross domestic product (everything the economy produces, after inflation): growth from the previous quarter. Two negative quarters in a row is a common definition of recession.",
+  gdp_y: "Gross domestic product (everything the economy produces, after inflation): growth compared with the same quarter a year earlier.",
+  gdp_m: "A monthly estimate of GDP: how much the whole economy grew from the previous month.",
+  ip: "Output of factories, mines and utilities compared with a year earlier. It swings more than the whole economy.",
+  cli: "The OECD's composite leading indicator, built from early-moving data to anticipate turning points. Above 100 means growth is above its trend.",
+  cpi: "Consumer price inflation: how much more a typical basket of goods and services costs than a year earlier. Most central banks aim for about 2%.",
+  cpi_m: "Consumer prices: the change from the previous month.",
+  core_cpi: "Inflation without the most volatile prices (usually food and energy), which shows the underlying trend that central banks watch.",
+  corecore_cpi: "Japan's inflation without fresh food and energy, the measure the Bank of Japan watches for underlying price pressure.",
+  core_pce: "Core PCE prices: the inflation measure the Federal Reserve targets at 2%. It excludes food and energy.",
+  services_cpi: "Inflation in services such as rents, restaurants and haircuts. It is driven by wages, so central banks watch it closely.",
+  cpi_trim: "One of the Bank of Canada's preferred core measures: inflation after dropping the most extreme price moves each month.",
+  cpi_median: "One of the Bank of Canada's preferred core measures: the middle price change across all items.",
+  trimmed: "The RBA's preferred core measure: inflation after dropping the biggest rises and falls each quarter.",
+  unemp: "The share of people who want a job but don't have one. Low unemployment tends to push wages and inflation up.",
+  nfp: "Nonfarm payrolls: how many jobs US employers added last month. One of the biggest market movers.",
+  jobs: "How many people gained or lost jobs in the month.",
+  ahe: "How much more US workers earn per hour than a year earlier.",
+  wages: "How much more workers earn per hour than a year earlier. Fast wage growth can keep inflation high.",
+  awe: "UK average weekly earnings including bonuses, compared with a year earlier (averaged over 3 months).",
+  awe_reg: "UK average weekly earnings without bonuses, compared with a year earlier (averaged over 3 months). The Bank of England watches this closely.",
+  claims: "How many people applied for unemployment benefit in the week. A rising trend is an early sign of job losses.",
+  jolts: "How many jobs US employers are trying to fill. More openings than job seekers means a tight jobs market.",
+  retail_m: "How much shops sold compared with the month before. A direct read on consumer spending.",
+  retail_y: "How much shops sold compared with a year earlier.",
+  retail_xauto: "US retail sales without car sales, which jump around a lot.",
+  retail_xf_m: "UK retail sales without fuel, compared with the month before. Fuel is excluded because its prices swing a lot.",
+  retail_xf_y: "UK retail sales without fuel, compared with a year earlier.",
+  umich: "The University of Michigan's monthly survey of how US households feel about their finances and the economy.",
+  cci: "The OECD's survey of how confident households feel. 100 is the long-run average; above 100 means more upbeat than usual.",
+  bci: "The OECD's survey of how confident businesses feel. 100 is the long-run average; above 100 means more upbeat than usual. Used here in place of PMIs, which are not free.",
+  housing: "How many new homes were started, at a yearly pace. Housing reacts early to interest rates.",
+  trade: "Exports minus imports. Negative is a deficit (the country buys more from abroad than it sells).",
+  exports: "The value of goods sold abroad compared with a year earlier.",
+  imports: "The value of goods bought from abroad compared with a year earlier. Strong imports usually mean strong home demand.",
+  policy: "The interest rate set by the central bank. It is the main tool for controlling inflation, and higher rates usually support the currency.",
+  y10: "What the government pays to borrow for 10 years. It reflects where markets expect interest rates and inflation to be over the long run.",
+};
+const HELP_FUND_ID = {
+  "GBP.retail_m": "UK retail sales including fuel, compared with the month before.",
+  "GBP.retail_y": "UK retail sales including fuel, compared with a year earlier.",
+  "JPY.core_cpi": "Japan's 'core' inflation, which excludes only fresh food. It is the figure most quoted in Japan.",
+};
+const CCY_PROSE = { EUR: ["euro", "euros"], GBP: ["British pound", "British pounds"], AUD: ["Australian dollar", "Australian dollars"], NZD: ["New Zealand dollar", "New Zealand dollars"],
+  USD: ["US dollar", "US dollars"], CAD: ["Canadian dollar", "Canadian dollars"], CHF: ["Swiss franc", "Swiss francs"], JPY: ["Japanese yen", "Japanese yen"] };
+function fxHelp(sym, derived) {
+  const [b, c] = sym.split("/"); if (!CCY_PROSE[b] || !CCY_PROSE[c]) return null;
+  return "How many " + CCY_PROSE[c][1] + " one " + CCY_PROSE[b][0] + " buys. Rising means the " + CCY_PROSE[b][0] + " is getting stronger against the " + CCY_PROSE[c][0] + "." +
+    (derived ? " Worked out from " + USD_LEG[b][0] + " and " + USD_LEG[c][0] + ", so it updates when they do." : "");
+}
+const helpPop = el("div", "help-pop"); helpPop.id = "helpPop"; helpPop.setAttribute("role", "tooltip");
+document.body.append(helpPop);
+let helpFor = null, helpPinned = false;
+function hq(text, label) {
+  if (!text) return document.createTextNode("");
+  const b = el("span", "hq", "?"); b.setAttribute("role", "button"); b.tabIndex = 0;
+  b.setAttribute("aria-label", "What is " + (label || "this") + "?"); b._help = text;
+  return b;
+}
+function openHelp(b, pin) {
+  if (helpFor && helpFor !== b) helpFor.setAttribute("aria-expanded", "false");
+  helpFor = b; helpPinned = pin;
+  helpPop.textContent = b._help; helpPop.style.display = "block";
+  b.setAttribute("aria-expanded", "true"); b.setAttribute("aria-describedby", "helpPop");
+  const r = b.getBoundingClientRect(), vw = document.documentElement.clientWidth, vh = window.innerHeight;
+  const w = helpPop.offsetWidth, h = helpPop.offsetHeight;
+  helpPop.style.left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, vw - w - 8)) + "px";
+  helpPop.style.top = (r.bottom + 6 + h > vh - 8 && r.top - h - 6 > 8 ? r.top - h - 6 : r.bottom + 6) + "px";
+}
+function closeHelp() {
+  if (helpFor) { helpFor.setAttribute("aria-expanded", "false"); helpFor.removeAttribute("aria-describedby"); }
+  helpFor = null; helpPinned = false; helpPop.style.display = "none";
+}
+const hqOf = e => e.target && e.target.closest ? e.target.closest(".hq") : null;
+// capture phase, so a "?" inside a clickable row, tile or label doesn't also select it
+document.addEventListener("click", e => {
+  const b = hqOf(e);
+  if (b) { e.preventDefault(); e.stopPropagation(); if (helpFor === b && helpPinned) closeHelp(); else openHelp(b, true); return; }
+  if (helpFor && !helpPop.contains(e.target)) closeHelp();
+}, true);
+document.addEventListener("keydown", e => {
+  const b = hqOf(e);
+  if (b && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); e.stopPropagation(); if (helpFor === b && helpPinned) closeHelp(); else openHelp(b, true); }
+  else if (e.key === "Escape" && helpFor) closeHelp();
+}, true);
+document.addEventListener("pointerover", e => { const b = hqOf(e); if (b && e.pointerType === "mouse" && !helpPinned) openHelp(b, false); });
+document.addEventListener("pointerout", e => { const b = hqOf(e); if (b && b === helpFor && !helpPinned && !b.contains(e.relatedTarget)) closeHelp(); });
+// keep an open note next to its "?" while the page scrolls; close it once the "?" is off screen
+window.addEventListener("scroll", () => {
+  if (!helpFor) return;
+  const r = helpFor.getBoundingClientRect();
+  if (!helpFor.isConnected || r.bottom < 0 || r.top > window.innerHeight) closeHelp(); else openHelp(helpFor, helpPinned);
+}, { passive: true, capture: true });
+window.addEventListener("resize", () => { if (helpFor) closeHelp(); });
+// a header row whose columns each get a "?" when there is help for them
+function headRow(cols) {
+  const tr = el("tr");
+  cols.forEach(x => { const th = el("th", "", x); if (x && HELP[x]) th.append(hq(HELP[x], x)); tr.append(th); });
+  return tr;
+}
+// static parts of the page
+document.querySelectorAll("[data-help]").forEach(n => {
+  const t = HELP[n.dataset.help]; if (!t) return;
+  const label = (n.firstChild && n.firstChild.textContent || "").trim();
+  const b = hq(t, label);
+  if (n.tagName === "H2") n.insertBefore(b, n.firstChild.nextSibling); else n.append(b);
+});
 let selected = { kind: "td", id: "SPY" };
 let range = "1Y";
 const RANGES = { "1M": 31, "3M": 92, "6M": 183, "1Y": 366, "2Y": 731, "5Y": 1827, "Max": 99999 };
@@ -621,22 +869,23 @@ function drawMarkets() {
   const wrap = $("markets"); wrap.replaceChildren();
   const quotes = D.prices && D.prices.quotes || [];
   ["Equities", "FX", "Commodities"].forEach(g => {
-    const p = el("section", "panel"); const h = el("h2", "", g === "Commodities" ? "Commodities & crypto" : g === "FX" ? "Currencies" : "Equities (ETFs)"); p.append(h, stampNode(g === "Equities" ? "prices_us" : g === "FX" ? "prices_fx" : "prices_fx,prices_us"));
+    const p = el("section", "panel"); const h = el("h2", "", g === "Commodities" ? "Commodities & crypto" : g === "FX" ? "Currencies" : "Equities (ETFs)"); h.append(hq(HELP[g], h.textContent)); p.append(h, stampNode(g === "Equities" ? "prices_us" : g === "FX" ? "prices_fx" : "prices_fx,prices_us"));
     if (g === "FX") {
       const tg = el("div", "ov-group fx-toggle"); tg.setAttribute("role", "group"); tg.setAttribute("aria-label", "Which currency pairs");
       [["majors", "Dollar pairs"], ["crosses", "Crosses (" + (D.xq || []).length + ")"]].forEach(([k, lab]) => {
         const b = el("button", "", lab); b.type = "button"; b.setAttribute("aria-pressed", fxView === k);
         b.onclick = () => { fxView = k; try { localStorage.setItem("mt-fx", k); } catch (e) {} drawMarkets(); }; tg.append(b);
       });
+      tg.append(hq(HELP.fxToggle, "dollar pairs and crosses"));
       p.append(tg);
       if (fxView === "crosses") p.append(el("p", "note", "Worked out from the dollar pairs, so they move with them; no extra data calls."));
     }
-    const t = el("table"); const hr = el("tr"); ["", "Last", "Today", "1Y"].forEach(x => hr.append(el("th", "", x))); t.append(hr);
+    const t = el("table"); t.append(headRow(["", "Last", "Today", "1Y"]));
     const qs = g === "FX" && fxView === "crosses" ? (D.xq || []) : quotes.filter(q => q.group === g);
     if (!qs.length) { p.append(el("div", "empty", "Waiting for the first price refresh.")); wrap.append(p); return; }
     qs.forEach(q => {
       const r = el("tr", "row" + (selected.kind === "td" && selected.id === q.symbol ? " sel" : "")); r.tabIndex = 0;
-      const c0 = el("td"); c0.append(el("span", "nm", q.name), el("span", "sym", q.symbol)); r.append(c0);
+      const c0 = el("td"); const nm = el("span", "nm", q.name); nm.append(hq(HELP_SYM[q.symbol] || fxHelp(q.symbol, q.derived), q.name)); c0.append(nm, el("span", "sym", q.symbol)); r.append(c0);
       if (q.price == null) { const c = el("td", "err", "unavailable"); c.colSpan = 3; c.title = q.error || ""; r.append(c); }
       else {
         r.append(el("td", "num", fmt(q.price, priceDigits(q.symbol, q.price))));
@@ -658,13 +907,13 @@ const UK_ROWS = ["IUDBEDR", "IUDSOIA", "IUDSNPY", "IUDMNPY", "IUDLNPY", "XUDLUSS
 function drawUK() { seriesTable("ukrates", UK_ROWS, D.boe, "Waiting for the first Bank of England refresh."); }
 function seriesTable(tableId, ids, ready, emptyMsg) {
   const t = $(tableId); t.replaceChildren();
-  const hr = el("tr"); ["", "Latest", "Chg", "1Y"].forEach(x => hr.append(el("th", "", x))); t.append(hr);
+  t.append(headRow(["", "Latest", "Chg", "1Y"]));
   if (!ready) { const r = el("tr"); const c = el("td", "empty", emptyMsg); c.colSpan = 4; r.append(c); t.append(r); return; }
   ids.forEach(id => {
     const s = fredSeries(id); if (!s || !s.obs.length) return;
     const last = s.obs.at(-1), prev = s.obs.at(-2), d = prev ? last[1] - prev[1] : null;
     const r = el("tr", "row" + (selected.kind === "fred" && selected.id === id ? " sel" : "")); r.tabIndex = 0;
-    const c0 = el("td"); c0.append(el("span", "nm", s.name), el("span", "sym", id + " · " + last[0].slice(5))); r.append(c0);
+    const c0 = el("td"); const nm = el("span", "nm", s.name); nm.append(hq(HELP_FRED[id], s.name)); c0.append(nm, el("span", "sym", id + " · " + last[0].slice(5))); r.append(c0);
     r.append(el("td", "num", fmtFred(s, last[1])));
     const c2 = el("td");
     c2.append(chgNode(d, d == null ? "" : isPct(s) ? (d > 0 ? "+" : "") + fmt(d * 100, 0) + " bp" : (d > 0 ? "+" : "") + fmt(d, /^XUDL(USS|ERS)$/.test(id) ? 4 : 2)));
@@ -688,8 +937,8 @@ function drawCalendar() {
   const today = new Date().toISOString().slice(0, 10);
   let ffEnd = "";
   if (F && F.events && F.events.length) {
-    w.append(el("div", "sub-h", "This week's economic events (Forex Factory, UK time)"));
-    const t = el("table"); const hr = el("tr"); ["", "Actual", "Fcst", "Prior"].forEach(x => hr.append(el("th", "", x))); t.append(hr);
+    const sh = el("div", "sub-h", "This week's economic events (Forex Factory, UK time)"); sh.append(hq(HELP.ff, "this list")); w.append(sh);
+    const t = el("table"); t.append(headRow(["", "Actual", "Fcst", "Prior"]));
     let lastDay = "";
     const now = Date.now();
     F.events.forEach(e => {
@@ -719,10 +968,10 @@ function drawCalendar() {
     w.append(t);
   }
   (C && C.notes || []).forEach(n => w.append(el("p", "note", n)));
-  w.append(el("div", "sub-h", "Big-company earnings"));
+  const eh = el("div", "sub-h", "Big-company earnings"); eh.append(hq(HELP.earn, "earnings")); w.append(eh);
   const ea = (C && C.earnings || []).filter(e => e.date >= today);
   if (!ea.length) { w.append(el("div", "empty", "No watched companies report in the next 10 days.")); return; }
-  const t = el("table"); const hr = el("tr"); ["", "When", "EPS est."].forEach(x => hr.append(el("th", "", x))); t.append(hr);
+  const t = el("table"); t.append(headRow(["", "When", "EPS est."]));
   ea.slice(0, 30).forEach(e => {
     const r = el("tr", "cal-row");
     r.append(el("td", "nm", e.symbol), el("td", "num", dayLabel(e.date) + (e.hour === "bmo" ? " · pre-open" : e.hour === "amc" ? " · after close" : "")),
@@ -751,13 +1000,13 @@ function drawCot() {
   const t = $("cot"); t.replaceChildren();
   const ms = D.cot && D.cot.markets || [];
   if (!ms.length) { const r = el("tr"); const c = el("td", "empty", "Waiting for the first COT download."); r.append(c); t.append(r); $("cotAsOf").textContent = ""; return; }
-  const hr = el("tr"); ["", "Net", "Week", "% of OI", "vs 3Y", "3Y"].forEach(x => hr.append(el("th", "", x))); t.append(hr);
+  t.append(headRow(["", "Net", "Week", "% of OI", "vs 3Y", "3Y"]));
   let group = "";
   ms.forEach(m => {
     if (m.group !== group) { group = m.group; const g = el("tr", "cot-group"); const c = el("td", "", group); c.colSpan = 6; g.append(c); t.append(g); }
     const st = cotStats(m);
     const r = el("tr", "row" + (selected.kind === "cot" && selected.id === m.code ? " sel" : "")); r.tabIndex = 0;
-    r.append(el("td", "nm", m.name), el("td", "num", fmtK(st.net)));
+    const cn = el("td", "nm", m.name); cn.append(hq(HELP_COT[m.name], m.name)); r.append(cn, el("td", "num", fmtK(st.net)));
     const c2 = el("td"); c2.append(chgNode(st.chg, fmtK(st.chg).replace("−", "-"))); r.append(c2);
     r.append(el("td", "num", st.pctOI == null ? "—" : (st.pctOI > 0 ? "+" : "") + fmt(st.pctOI, 0) + "%"));
     const c4 = el("td"); const mt = el("span", "meter"); const dot = el("i"); dot.style.left = (st.pos * 100).toFixed(0) + "%"; mt.append(dot);
@@ -781,7 +1030,7 @@ function drawEcon() {
     const last = s.obs.at(-1), prev = s.obs.at(-2);
     const b = el("button", "tile" + (selected.kind === "fred" && selected.id === id ? " sel" : "")); b.type = "button";
     const when = new Date(last[0] + "T00:00:00Z").toLocaleDateString("en-US", id === "GDPC1" ? { month: "short", year: "numeric", timeZone: "UTC" } : id === "ICSA" ? { month: "short", day: "numeric", timeZone: "UTC" } : { month: "short", year: "numeric", timeZone: "UTC" });
-    b.append(el("div", "t", s.name), el("div", "v", fmtFred(s, last[1])), el("div", "p", (id === "GDPC1" ? "Quarter from " : "") + when + (prev ? " · prior " + fmtFred(s, prev[1]) : "")));
+    const tt = el("div", "t", s.name); tt.append(hq(HELP_FRED[id], s.name)); b.append(tt, el("div", "v", fmtFred(s, last[1])), el("div", "p", (id === "GDPC1" ? "Quarter from " : "") + when + (prev ? " · prior " + fmtFred(s, prev[1]) : "")));
     b.onclick = () => { selected = { kind: "fred", id }; if (RANGES[range] < 1000) range = "5Y"; renderAll(); window.scrollTo({ top: 0, behavior: "smooth" }); };
     w.append(b);
   });
@@ -1024,6 +1273,7 @@ function drawOverlay() {
   box.onblur = hide;
   // legend: last value, freshness, % change over the window, correlation with the primary
   const st = D.status && D.status.sources || {};
+  const lh = el("div", "ov-legend-help", "Reading the legend"); lh.append(hq(HELP.ovLegend, "the legend")); $("ovLegend").append(lh);
   list.forEach(s => {
     const it = el("div", "ov-item"); const sw = el("span", "sw"); sw.style.background = s.color; it.append(sw);
     const nm = el("span", "nm", s.c.short); if (s === pri) nm.append(el("span", "pri", " primary")); it.append(nm);
@@ -1045,7 +1295,7 @@ function drawOverlay() {
       const a = [], b = [];
       pri.pts.forEach(p => { const v = valueOn(s.pts, p[0]); if (v != null && p[1] != null) { a.push(p[1]); b.push(v); } });
       const r = corr(a, b);
-      it.append(el("span", "r", r == null ? "r —" : "r " + (r > 0 ? "+" : "") + fmt(r, 2) + " vs " + pri.c.short));
+      const rs = el("span", "r", r == null ? "r —" : "r " + (r > 0 ? "+" : "") + fmt(r, 2) + " vs " + pri.c.short); rs.append(hq(HELP.corr, "r")); it.append(rs);
       const mk = el("button", "", "make primary"); mk.type = "button"; mk.onclick = () => { OV.primary = s.key; ovSave(); drawOverlay(); }; it.append(mk);
     }
     const rm = el("button", "", "×"); rm.type = "button"; rm.title = "Remove " + s.c.name; rm.setAttribute("aria-label", "Remove " + s.c.name);
@@ -1169,13 +1419,13 @@ function drawFund() {
   const after = [];
   (D.fund.groups || []).forEach(g => {
     const items = C.items.filter(i => i.group === g); if (!items.length) return;
-    const sec = el("section", "panel"); const h = el("h2", "", g); sec.append(h);
+    const sec = el("section", "panel"); const h = el("h2", "", g); h.append(hq(HELP[g], g)); sec.append(h);
     const t = el("table"); const hr = el("tr");
-    ["Indicator", "Latest", "Prior", "Period", "5 years", ""].forEach(x => hr.append(el("th", "", x))); t.append(hr);
+    t.append(headRow(["Indicator", "Latest", "Prior", "Period", "5 years", ""]));
     items.forEach(i => {
       const p = i.pts, last = p.at(-1), prev = p.at(-2), key = "fund:" + i.id, open = FUND.open === i.id;
       const r = el("tr", "row" + (open ? " open" : "")); r.tabIndex = 0; r.setAttribute("aria-expanded", open);
-      const c0 = el("td"); c0.append(el("div", "nm", i.name), el("span", "sym", i.src + " · " + (FREQ_LABEL[i.freq] || "") + (i.note ? " · " + i.note : ""))); r.append(c0);
+      const c0 = el("td"); const nm = el("div", "nm", i.name); nm.append(hq(HELP_FUND_ID[i.id] || HELP_FUND[i.id.split(".")[1]], i.name)); c0.append(nm, el("span", "sym", i.src + " · " + (FREQ_LABEL[i.freq] || "") + (i.note ? " · " + i.note : ""))); r.append(c0);
       r.append(el("td", "num lt", last ? fundFmt(i, last[1]) : "—"), el("td", "num pr", prev ? fundFmt(i, prev[1]) : "—"), el("td", "pd", last ? periodLabel(last[0], i.freq) : ""));
       const cs = el("td"); const cut = new Date(Date.parse(last[0]) - 1827 * 864e5).toISOString().slice(0, 10); cs.append(spark(p.filter(x => x[0] >= cut))); r.append(cs);
       const ca = el("td", "act"); const inOv = OV.series.includes(key);
@@ -1203,7 +1453,7 @@ function drawFund() {
         const shown = p.filter(x => x[0] >= c2);
         after.push(() => shown.length >= 2 ? lineChart(box, [{ name: i.name, pts: shown, color: "var(--s1)" }], { fmtY: v => fundFmt(i, v), xLabels: "date", zero: i.unit === "%" }) : box.append(el("div", "empty", "Not enough history to chart.")));
         const past = el("details", "fund-past"); past.open = true; past.append(el("summary", "", "Past data (latest 24)"));
-        const pt = el("table"); const ph = el("tr"); ["Period", "Value", "Change"].forEach(x => ph.append(el("th", "", x))); pt.append(ph);
+        const pt = el("table"); pt.append(headRow(["Period", "Value", "Change"]));
         p.slice(-24).reverse().forEach((x, j, arr) => {
           const rr = el("tr"); const before = p[p.length - 2 - j];
           const d = before ? x[1] - before[1] : null;
