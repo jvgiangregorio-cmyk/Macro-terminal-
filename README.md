@@ -17,10 +17,8 @@ A personal markets dashboard (rates, FX, equities, commodities, economic data an
 | Futures positioning (COT): speculators' net long minus short, 21 markets, 10 years weekly | CFTC public reporting API (no key) | quick check every 10 min; new report each Friday |
 | UK Bank Rate, SONIA, gilt yields, sterling | Bank of England database (no key) | every 30 min |
 | This week's economic calendar (forecast, previous) | Forex Factory public feed (no key) | every 30 min |
-| Big-company earnings dates, market news | Finnhub (`FINNHUB_API_KEY` secret) | news every 10 min, earnings hourly |
+| Big-company earnings dates | Finnhub (`FINNHUB_API_KEY` secret) | hourly |
 | Later US release dates | FRED | hourly |
-| Headlines | Fed, ECB, MarketWatch, CNBC, BBC RSS feeds | every 10 min |
-| Research | Public research feeds: ING Think, Nordea, WSJ, Goldman Sachs podcast, Fed Beige Book, FactSet Insight (headlines and links only), plus a library of links to other banks' free research pages | hourly |
 
 ## The API keys
 
