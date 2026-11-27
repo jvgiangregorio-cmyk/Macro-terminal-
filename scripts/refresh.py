@@ -11,6 +11,9 @@ Sources
   Finnhub      earnings dates
   CFTC         Commitments of Traders futures positioning (no key needed)
   Forex Factory  this week's economic calendar (no key needed)
+  Fundamentals  economic indicators for the eight major currencies from FRED, ONS,
+                ECB, OECD, BIS, Statistics Canada, RBA, SNB and Japan's Statistics
+                Bureau (see scripts/fundamentals.py; only FRED needs a key)
 
 GitHub starts this every 10 minutes. Each source has its own timer (SCHEDULE
 below) so nobody's limits are hit, and docs/data/status.json records when each
@@ -70,6 +73,7 @@ SCHEDULE = {
     "cot": 10,            # quick "is there a new report?" check
     "calendar": 60,       # earnings dates + US release dates
     "forexfactory": 30,   # Forex Factory asks people not to poll it often
+    "fundamentals": 360,  # official economic statistics (scripts/fundamentals.py), ~55 requests
 }
 US_SESSION_UTC = (13 * 60 + 30, 21 * 60 + 15)   # minutes after midnight UTC (covers summer and winter time)
 TD_BATCH = 8          # free plan: 8 calls per minute
@@ -602,6 +606,21 @@ def parse_date(s):
     return iso(t.astimezone(dt.timezone.utc))
 
 
+# ---------------------------------------------------------------- Fundamentals
+
+
+def fetch_fundamentals(fred_key):
+    import fundamentals
+    print("Fundamentals")
+    payload, errors = fundamentals.fetch_all(fred_key, load("fundamentals.json"))
+    n = sum(len(c["items"]) for c in payload["countries"].values())
+    print(f"  {n} indicators, {len(errors)} problems")
+    if not n:
+        raise RuntimeError("; ".join(errors[:3]) or "no data")
+    payload["errors"] = errors
+    return save("fundamentals.json", dict(updated=iso(now_utc()), **payload))
+
+
 # ---------------------------------------------------------------- main
 
 
@@ -651,6 +670,9 @@ def main():
         print("FINNHUB_API_KEY is not set: skipping earnings dates. Add it under Settings > Secrets.")
     elif due("calendar", force) or load("calendar.json") is None:
         run_source("calendar", fetch_calendar, fh_key, fred_key)
+
+    if due("fundamentals", force) or load("fundamentals.json") is None:
+        run_source("fundamentals", fetch_fundamentals, fred_key)
 
     # Sources that were removed from the terminal: drop their old files and status.
     for gone in ("news", "finnhub_news", "research"):

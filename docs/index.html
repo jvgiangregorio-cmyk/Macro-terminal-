@@ -146,6 +146,46 @@ details.tbl table{margin-top:6px;max-width:360px}
 :root{--ov-bg:#fbfbf9;--ev:#b8860b}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ov-bg:#111111;--ev:#d9a933}}
 :root[data-theme="dark"]{--ov-bg:#111111;--ev:#d9a933}
+/* fundamentals */
+.subtabs{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 12px}
+.subtabs button{font:500 12.5px "IBM Plex Mono",monospace;padding:4px 12px}
+.subtabs button small{color:var(--faint);font:400 11.5px "IBM Plex Sans",sans-serif;margin-left:6px}
+.subtabs button[aria-selected="true"]{background:var(--sel);border-color:var(--accent)}
+.fund-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px;margin-bottom:6px}
+.fund-title{font-size:16px;font-weight:600}
+.fund-head .upd{margin:0}
+#fundNote .note{margin-bottom:10px}
+#fundNote details{font-size:12px;color:var(--faint);margin:-4px 0 10px}
+#fundNote details ul{margin:4px 0 0;padding-left:18px}
+.fund-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,560px),1fr));gap:14px;align-items:start}
+.fund-grid td.lt{font-weight:500}
+.fund-grid td.pr{color:var(--faint)}
+.fund-grid td.pd{color:var(--muted);font-size:12px}
+.fund-grid tr.open{background:var(--sel)}
+.fund-grid td.act{width:1%}
+.fund-btn{font-size:11.5px;padding:1px 7px;white-space:nowrap}
+.fund-btn.on{border-color:var(--accent);color:var(--accent)}
+tr.fund-detail > td{padding:8px 4px 14px;text-align:left;white-space:normal}
+.fund-past td{padding:3px 4px}
+.fund-grid .panel{overflow-x:auto}
+@media (max-width:640px){.fund-grid th:nth-child(3),.fund-grid td.pr,.fund-grid th:nth-child(5),.fund-grid tr.row > td:nth-child(5){display:none}.fund-grid td.pd{white-space:normal}.ov-search input{width:100%}}
+.fund-detail .bar{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-bottom:6px;font-size:12px;color:var(--faint)}
+.fund-detail .bar .ranges{margin-left:auto}
+.fund-chart{position:relative;height:240px}
+.fund-chart svg{display:block;width:100%;height:100%}
+.fund-chart .gridline{stroke:var(--grid);stroke-width:1}
+.fund-chart .axis{stroke:var(--line)}
+.fund-chart .series{fill:none;stroke-width:2;stroke-linejoin:round}
+.fund-chart .xhair{stroke:var(--faint);stroke-width:1;stroke-dasharray:2 3}
+.fund-past{margin-top:8px;font-size:12.5px;color:var(--muted)}
+.fund-past table{margin-top:6px;max-width:420px}
+.ov-search{position:relative}
+.ov-search input{font:inherit;font-size:12.5px;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 8px;width:230px}
+.ov-results{position:absolute;top:100%;left:0;z-index:5;width:min(420px,90vw);max-height:380px;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.18);margin-top:4px;padding:4px}
+.ov-results button{display:block;width:100%;text-align:left;border:0;border-radius:4px;padding:5px 8px;font-size:12.5px;background:transparent}
+.ov-results button small{display:block;color:var(--faint);font-size:11px}
+.ov-results button.act,.ov-results button:hover{background:var(--hover)}
+.ov-results .none{color:var(--faint);font-size:12.5px;padding:6px 8px}
 /* economy */
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .tile{border:1px solid var(--line);border-radius:8px;padding:10px;cursor:pointer;background:transparent;text-align:left}
@@ -171,6 +211,7 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
   </header>
   <nav class="tabs" role="tablist" aria-label="Pages">
     <button type="button" role="tab" id="tabbtn-home" data-tab="home">Homepage</button>
+    <button type="button" role="tab" id="tabbtn-fund" data-tab="fund">Fundamentals</button>
     <button type="button" role="tab" id="tabbtn-overlays" data-tab="overlays">Chart overlays</button>
   </nav>
   <div id="banner"></div>
@@ -238,12 +279,26 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
   </div>
   </div>
 
+  <div id="tab-fund" role="tabpanel" aria-labelledby="tabbtn-fund" hidden>
+    <nav class="subtabs" id="fundTabs" role="tablist" aria-label="Currencies"></nav>
+    <div class="fund-head">
+      <div class="fund-title" id="fundTitle"></div>
+      <div class="upd" data-src="fundamentals"></div>
+    </div>
+    <div id="fundNote"></div>
+    <div class="fund-grid" id="fundBody"></div>
+  </div>
+
   <div id="tab-overlays" role="tabpanel" aria-labelledby="tabbtn-overlays" hidden>
     <section class="panel ov-panel">
       <div class="ov-controls">
         <label class="ov-field">Add a series
           <select id="ovAdd"></select>
         </label>
+        <div class="ov-search">
+          <input type="search" id="ovSearch" placeholder="Search, e.g. UK retail" aria-label="Search all series" autocomplete="off" aria-controls="ovResults" aria-expanded="false">
+          <div class="ov-results" id="ovResults" role="listbox" aria-label="Matching series" hidden></div>
+        </div>
         <div class="ov-group" role="group" aria-label="Scale">
           <button type="button" data-mode="dual">Own scales</button>
           <button type="button" data-mode="rebased">Rebased to 100</button>
@@ -266,7 +321,7 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
   </div>
 
   <footer>
-    Prices: Twelve Data (currencies, gold and bitcoin every 20 minutes on weekdays; ETFs every 15 minutes in US market hours). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Futures positioning: CFTC Commitments of Traders, legacy futures-only report (released Fridays for the prior Tuesday). UK rates and sterling: Bank of England. Earnings dates: Finnhub.
+    Prices: Twelve Data (currencies, gold and bitcoin every 20 minutes on weekdays; ETFs every 15 minutes in US market hours). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Futures positioning: CFTC Commitments of Traders, legacy futures-only report (released Fridays for the prior Tuesday). UK rates and sterling: Bank of England. Earnings dates: Finnhub. Fundamentals: FRED, ONS, ECB, Statistics Bureau of Japan, SNB, Statistics Canada, RBA, OECD and BIS (checked every 6 hours).
     The data refreshes on GitHub every 10 minutes (each source on its own timer, shown under each panel in UK time) and this page re-reads it every 2 minutes. Economic calendar: Forex Factory. Not investment advice.
   </footer>
 </div>
@@ -281,7 +336,7 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 const SVGNS = "http://www.w3.org/2000/svg";
 const sv = (tag, attrs) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); return e; };
 
-let D = { prices: null, hist: null, fred: null, cot: null, boe: null, cal: null, ff: null, status: null };
+let D = { prices: null, hist: null, fred: null, cot: null, boe: null, cal: null, ff: null, status: null, fund: null };
 let selected = { kind: "td", id: "SPY" };
 let range = "1Y";
 const RANGES = { "1M": 31, "3M": 92, "6M": 183, "1Y": 366, "2Y": 731, "5Y": 1827, "Max": 99999 };
@@ -332,9 +387,9 @@ const ukTime = iso => {
   return day === today ? t : day + " " + t;
 };
 const SRC_LABEL = { prices_fx: "FX, gold & bitcoin", prices_us: "ETFs", fred: "FRED", boe: "Bank of England", cot: "CFTC",
-  calendar: "earnings & US dates", forexfactory: "Forex Factory", price_history: "price history" };
+  calendar: "earnings & US dates", forexfactory: "Forex Factory", price_history: "price history", fundamentals: "economic data" };
 const SRC_EVERY = { prices_fx: "every 20 min on weekdays", prices_us: "every 15 min in US market hours", fred: "every 30 min", boe: "every 30 min",
-  cot: "every 10 min (new report weekly)", calendar: "hourly", forexfactory: "every 30 min", price_history: "daily" };
+  cot: "every 10 min (new report weekly)", calendar: "hourly", forexfactory: "every 30 min", price_history: "daily", fundamentals: "every 6 hours" };
 function stampNode(srcs) {
   const st = D.status && D.status.sources || {};
   const box = el("div", "upd");
@@ -721,19 +776,24 @@ function drawRanges() {
 function renderAll() {
   hideTip();
   if (activeTab === "overlays") { drawHeader(); drawOverlay(); return; }
+  if (activeTab === "fund") { drawHeader(); drawFund(); drawStamps(); return; }
   drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawCot(); drawRates(); drawUK(); drawCalendar(); drawStamps(); drawCurve(); drawEcon();
 }
 
 // ---------- tabs
+const TAB_HASH = { overlays: "#overlays", fund: "#fundamentals" };
 let activeTab = "home";
-try { activeTab = location.hash === "#overlays" ? "overlays" : (localStorage.getItem("mt-tab") || "home"); } catch (e) {}
+try {
+  const fromHash = Object.keys(TAB_HASH).find(k => TAB_HASH[k] === location.hash);
+  activeTab = fromHash || localStorage.getItem("mt-tab") || "home";
+  if (!["home", "fund", "overlays"].includes(activeTab)) activeTab = "home";
+} catch (e) {}
 function showTab(name) {
   activeTab = name;
   document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === name));
-  $("tab-home").hidden = name !== "home";
-  $("tab-overlays").hidden = name !== "overlays";
-  try { localStorage.setItem("mt-tab", name); history.replaceState(null, "", name === "overlays" ? "#overlays" : location.pathname); } catch (e) {}
-  hideTip();
+  ["home", "fund", "overlays"].forEach(t => { $("tab-" + t).hidden = name !== t; });
+  try { localStorage.setItem("mt-tab", name); history.replaceState(null, "", TAB_HASH[name] || location.pathname); } catch (e) {}
+  hideTip(); closeSearch();
   if (name === "overlays") drawOverlay(); else renderAll();
 }
 document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
@@ -770,6 +830,11 @@ function ovCatalogue() {
     cat[k + ":" + id] = { name: s.name, short: id, group: grp, pts: () => s.obs, fmt: v => fmtFred(full, v),
       freq: id === "GDPC1" ? "quarterly" : monthly ? "monthly" : ["ICSA", "MORTGAGE30US"].includes(id) ? "weekly" : "daily", src: k };
   }));
+  Object.values(fundItems()).forEach(i => {
+    cat["fund:" + i.id] = { name: i.country + ": " + i.name, short: i.cur + " " + i.name, group: "Fundamentals · " + i.cur + " " + i.country,
+      pts: () => i.pts, fmt: v => fundFmt(i, v), freq: FREQ_LABEL[i.freq] || "monthly", src: "fundamentals",
+      chg: i.unit === "%" ? "pp" : /change/i.test(i.name) ? "diff" : "pct", alias: CUR_ALIAS[i.cur] || "" };
+  });
   (D.cot && D.cot.markets || []).forEach(m => {
     cat["cot:" + m.code] = { name: m.name + " spec net", short: "COT " + m.name, group: "Futures positioning (COT)",
       pts: () => m.obs.map(p => [p[0], p[1]]), fmt: v => fmt(v, 0), freq: "weekly", src: "cot" };
@@ -925,7 +990,10 @@ function drawOverlay() {
     const checked = st[s.c.src] && st[s.c.src].checked;
     const live = s.c.freq === "live" && checked && Date.now() - new Date(checked) < 40 * 60000;
     it.append(el("span", live ? "live" : "freq", live ? "● LIVE" : s.c.freq));
-    if (last != null && first) {
+    if (last != null && first != null && s.c.chg && s.c.chg !== "pct") {
+      const d = last - first;
+      it.append(chgNode(d, (d > 0 ? "+" : "") + (s.c.chg === "pp" ? fmt(d, 2) + " pp" : s.c.fmt(d).replace(/^\+/, ""))));
+    } else if (last != null && first) {
       const pct = (last / first - 1) * 100;
       const useDiff = s.key.startsWith("fred:") || s.key.startsWith("boe:") ? /%|pp/.test((cat[s.key] && (D.fred && D.fred.series[s.key.split(":")[1]] || D.boe && D.boe.series[s.key.split(":")[1]] || {}).unit) || "") : false;
       const txt = useDiff ? ((last - first) * 100 > 0 ? "+" : "") + fmt((last - first) * 100, 0) + " bp" : s.key.startsWith("cot:") ? ((last - first) > 0 ? "+" : "") + fmt(last - first, 0) : (pct > 0 ? "+" : "") + fmt(pct, 2) + "%";
@@ -959,16 +1027,176 @@ $("ovEventForm").onsubmit = ev => {
   $("ovEventLabel").value = ""; drawOverlay();
 };
 
+// ---------- overlay search
+const CUR_ALIAS = { USD: "us usa america american dollar", EUR: "eu euro eurozone ez europe", GBP: "uk britain british sterling pound england",
+  JPY: "japan japanese yen jp", CHF: "swiss switzerland franc", CAD: "canada canadian loonie", AUD: "australia australian aussie", NZD: "new zealand nz kiwi" };
+let searchHits = [], searchAct = 0;
+function closeSearch() { const r = $("ovResults"); if (r) { r.hidden = true; $("ovSearch").setAttribute("aria-expanded", "false"); } }
+function addToOverlay(key) {
+  if (OV.series.includes(key)) return "already";
+  if (OV.series.length >= OV_MAX) return "full";
+  OV.series.push(key); if (!OV.primary || !OV.series.includes(OV.primary)) OV.primary = key; ovSave(); return "added";
+}
+function runSearch() {
+  const q = $("ovSearch").value.trim().toLowerCase(), box = $("ovResults");
+  if (!q) { closeSearch(); return; }
+  const cat = ovCatalogue(), words = q.split(/\s+/);
+  searchHits = Object.entries(cat).filter(([k, c]) => !OV.series.includes(k)).map(([k, c]) => {
+    const hay = (c.name + " " + c.short + " " + c.group + " " + (c.alias || "") + " " + k).toLowerCase();
+    if (!words.every(w => hay.includes(w))) return null;
+    const score = words.reduce((n, w) => n + (c.name.toLowerCase().includes(w) ? 2 : 0) + ((" " + c.short.toLowerCase()).includes(" " + w) ? 1 : 0), 0);
+    return [k, c, score];
+  }).filter(Boolean).sort((a, b) => b[2] - a[2]).slice(0, 25);
+  searchAct = 0;
+  box.replaceChildren();
+  if (!searchHits.length) box.append(el("div", "none", "No series match “" + q + "”"));
+  searchHits.forEach(([k, c], i) => {
+    const b = el("button", i === 0 ? "act" : "", c.name); b.type = "button"; b.setAttribute("role", "option");
+    b.append(el("small", "", c.group + " · " + c.freq));
+    b.onmousedown = e => e.preventDefault();
+    b.onclick = () => pickSearch(i);
+    box.append(b);
+  });
+  box.hidden = false; $("ovSearch").setAttribute("aria-expanded", "true");
+}
+function pickSearch(i) {
+  const hit = searchHits[i]; if (!hit) return;
+  const r = addToOverlay(hit[0]);
+  $("ovSearch").value = ""; closeSearch();
+  if (r === "full") $("ovSearch").placeholder = "Chart is full (" + OV_MAX + "). Remove one first.";
+  drawOverlay();
+}
+$("ovSearch").addEventListener("input", runSearch);
+$("ovSearch").addEventListener("focus", () => { if ($("ovSearch").value.trim()) runSearch(); });
+$("ovSearch").addEventListener("blur", () => setTimeout(closeSearch, 120));
+$("ovSearch").addEventListener("keydown", e => {
+  const btns = [...$("ovResults").querySelectorAll("button")];
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault(); if (!btns.length) return;
+    searchAct = (searchAct + (e.key === "ArrowDown" ? 1 : -1) + btns.length) % btns.length;
+    btns.forEach((b, i) => b.classList.toggle("act", i === searchAct)); btns[searchAct].scrollIntoView({ block: "nearest" });
+  } else if (e.key === "Enter") { e.preventDefault(); pickSearch(searchAct); }
+  else if (e.key === "Escape") { $("ovSearch").value = ""; closeSearch(); }
+});
+
+// ---------- fundamentals
+const FUND_CURS = ["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD"];
+const FREQ_LABEL = { M: "monthly", Q: "quarterly", W: "weekly", D: "daily" };
+const FUND_RANGES = { "2Y": 731, "5Y": 1827, "10Y": 3653, "Max": 99999 };
+let FUND = { cur: "USD", open: null, range: "5Y" };
+try { const c = localStorage.getItem("mt-fund-cur"); if (FUND_CURS.includes(c)) FUND.cur = c; } catch (e) {}
+function fundItems() {
+  const out = {};
+  Object.entries(D.fund && D.fund.countries || {}).forEach(([cur, c]) => (c.items || []).forEach(i => { out[i.id] = Object.assign({ cur, country: c.name }, i); }));
+  return out;
+}
+function fundFmt(i, v) {
+  if (v == null || isNaN(v)) return "—";
+  const dp = i.dp == null ? 1 : i.dp, sign = /change/i.test(i.name) && v > 0 ? "+" : "";
+  if (i.unit === "%") return fmt(v, dp) + "%";
+  if (i.unit === "k") return sign + fmt(v, dp) + "k";
+  if (i.unit === "$bn" || i.unit === "£bn") return (v < 0 ? "−" : "") + i.unit[0] + fmt(Math.abs(v), dp) + "bn";
+  return sign + fmt(v, dp);
+}
+function periodLabel(d, f) {
+  const t = new Date(d + "T00:00:00Z");
+  if (f === "Q") return "Q" + (Math.floor(t.getUTCMonth() / 3) + 1) + " " + t.getUTCFullYear();
+  if (f === "M") return t.toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
+  return t.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+}
+function drawFund() {
+  if (activeTab !== "fund") return;
+  const F = D.fund && D.fund.countries;
+  $("fundTabs").replaceChildren(...FUND_CURS.map(cur => {
+    const b = el("button", "", cur); b.type = "button"; b.setAttribute("role", "tab"); b.setAttribute("aria-selected", cur === FUND.cur);
+    b.append(el("small", "", F && F[cur] ? F[cur].name : ""));
+    b.onclick = () => { FUND.cur = cur; FUND.open = null; try { localStorage.setItem("mt-fund-cur", cur); } catch (e) {} drawFund(); };
+    return b;
+  }));
+  const body = $("fundBody"); body.replaceChildren(); $("fundNote").replaceChildren();
+  const C = F && F[FUND.cur];
+  if (!C) { $("fundTitle").textContent = FUND.cur; body.append(el("div", "empty", D.fund ? "No data for this currency yet." : "Loading economic data… If this stays empty, the first download hasn't run yet; it runs within 10 minutes of the update going live.")); return; }
+  $("fundTitle").textContent = FUND.cur + " · " + C.name + " (" + C.items.length + " indicators)";
+  const srcs = [...new Set(C.items.map(i => i.src))].join(", ");
+  $("fundNote").append(el("p", "note", "Click an indicator for its chart and past data, or press “+ Overlay” to put it on the Chart overlays page. Sources: " + srcs + "." + (C.gap ? " Gaps: " + C.gap : "") + " Business surveys are the OECD's, since PMIs are not free."));
+  const errs = (D.fund.errors || []).filter(e => e.startsWith(FUND.cur + ".") || /^(OECD|BIS)/.test(e));
+  if (errs.length) {
+    const d = el("details"); d.append(el("summary", "", errs.length + " item(s) didn't refresh on the last check (older figures are kept)"));
+    const ul = el("ul"); errs.slice(0, 8).forEach(e => ul.append(el("li", "", e))); d.append(ul); $("fundNote").append(d);
+  }
+  const after = [];
+  (D.fund.groups || []).forEach(g => {
+    const items = C.items.filter(i => i.group === g); if (!items.length) return;
+    const sec = el("section", "panel"); const h = el("h2", "", g); sec.append(h);
+    const t = el("table"); const hr = el("tr");
+    ["Indicator", "Latest", "Prior", "Period", "5 years", ""].forEach(x => hr.append(el("th", "", x))); t.append(hr);
+    items.forEach(i => {
+      const p = i.pts, last = p.at(-1), prev = p.at(-2), key = "fund:" + i.id, open = FUND.open === i.id;
+      const r = el("tr", "row" + (open ? " open" : "")); r.tabIndex = 0; r.setAttribute("aria-expanded", open);
+      const c0 = el("td"); c0.append(el("div", "nm", i.name), el("span", "sym", i.src + " · " + (FREQ_LABEL[i.freq] || "") + (i.note ? " · " + i.note : ""))); r.append(c0);
+      r.append(el("td", "num lt", last ? fundFmt(i, last[1]) : "—"), el("td", "num pr", prev ? fundFmt(i, prev[1]) : "—"), el("td", "pd", last ? periodLabel(last[0], i.freq) : ""));
+      const cs = el("td"); const cut = new Date(Date.parse(last[0]) - 1827 * 864e5).toISOString().slice(0, 10); cs.append(spark(p.filter(x => x[0] >= cut))); r.append(cs);
+      const ca = el("td", "act"); const inOv = OV.series.includes(key);
+      const ob = el("button", "fund-btn" + (inOv ? " on" : ""), inOv ? "In overlays →" : "+ Overlay"); ob.type = "button";
+      ob.title = inOv ? "Open the Chart overlays page" : "Add " + C.name + " " + i.name + " to Chart overlays";
+      ob.onclick = e => {
+        e.stopPropagation();
+        if (OV.series.includes(key)) { showTab("overlays"); return; }
+        const res = addToOverlay(key);
+        if (res === "full") { ob.textContent = "Overlays full (" + OV_MAX + ")"; return; }
+        ob.textContent = "In overlays →"; ob.classList.add("on"); ob.title = "Open the Chart overlays page";
+      };
+      ca.append(ob); r.append(ca);
+      const toggle = () => { FUND.open = open ? null : i.id; drawFund(); };
+      r.onclick = toggle; r.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } };
+      t.append(r);
+      if (open) {
+        const dr = el("tr", "fund-detail"); const td = el("td"); td.colSpan = 6;
+        const bar = el("div", "bar");
+        bar.append(el("span", "", p.length + " readings since " + periodLabel(p[0][0], i.freq)));
+        const rg = el("div", "ranges"); Object.keys(FUND_RANGES).forEach(k => { const b = el("button", "", k); b.type = "button"; b.setAttribute("aria-pressed", k === FUND.range); b.onclick = () => { FUND.range = k; drawFund(); }; rg.append(b); });
+        bar.append(rg); td.append(bar);
+        const box = el("div", "fund-chart"); box.tabIndex = 0; box.setAttribute("aria-label", i.name + " chart. Use left and right arrow keys to read values."); td.append(box);
+        const c2 = new Date(Date.parse(last[0]) - FUND_RANGES[FUND.range] * 864e5).toISOString().slice(0, 10);
+        const shown = p.filter(x => x[0] >= c2);
+        after.push(() => shown.length >= 2 ? lineChart(box, [{ name: i.name, pts: shown, color: "var(--s1)" }], { fmtY: v => fundFmt(i, v), xLabels: "date", zero: i.unit === "%" }) : box.append(el("div", "empty", "Not enough history to chart.")));
+        const past = el("details", "fund-past"); past.open = true; past.append(el("summary", "", "Past data (latest 24)"));
+        const pt = el("table"); const ph = el("tr"); ["Period", "Value", "Change"].forEach(x => ph.append(el("th", "", x))); pt.append(ph);
+        p.slice(-24).reverse().forEach((x, j, arr) => {
+          const rr = el("tr"); const before = p[p.length - 2 - j];
+          const d = before ? x[1] - before[1] : null;
+          rr.append(el("td", "num", periodLabel(x[0], i.freq)), el("td", "num", fundFmt(i, x[1])),
+                    el("td", "", "")); rr.lastChild.append(d == null ? "—" : chgNode(d, (d > 0 ? "+" : "") + fmt(d, i.dp == null ? 1 : i.dp) + (i.unit === "%" ? " pp" : "")));
+          pt.append(rr);
+        });
+        past.append(pt); td.append(past);
+        dr.append(td); t.append(dr);
+      }
+    });
+    sec.append(t); body.append(sec);
+  });
+  after.forEach(f => f());
+}
+
 // ---------- loading
 async function getJSON(name) {
   try { const r = await fetch("data/" + name + "?t=" + Date.now(), { cache: "no-store" }); return r.ok ? await r.json() : null; }
   catch (e) { return null; }
 }
+let fundAt = 0, fundSeen = null;
 async function load() {
   const names = ["prices", "price_history", "fred", "cot", "boe", "calendar", "ff", "status"];
   const got = await Promise.all(names.map(n => getJSON(n + ".json")));
   const keys = ["prices", "hist", "fred", "cot", "boe", "cal", "ff", "status"];
-  const next = {}; keys.forEach((k, i) => next[k] = got[i] || D[k]); D = next;
+  const next = {}; keys.forEach((k, i) => next[k] = got[i] || D[k]);
+  // economic data is larger and changes a few times a day: re-read it every 30 minutes, or when its source changed
+  const fst = next.status && next.status.sources && next.status.sources.fundamentals;
+  const fundStamp = fst && fst.changed;
+  if (!D.fund || Date.now() - fundAt > 30 * 60000 || fundStamp !== fundSeen) {
+    const f = await getJSON("fundamentals.json");
+    if (f) { next.fund = f; fundAt = Date.now(); fundSeen = fundStamp; } else next.fund = D.fund;
+  } else next.fund = D.fund;
+  D = next;
   renderAll();
 }
 let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderAll, 150); });
