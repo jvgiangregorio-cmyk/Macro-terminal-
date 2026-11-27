@@ -14,3 +14,9 @@ print("ERRORS", json.dumps(errors, indent=1))
 os.makedirs("out", exist_ok=True)
 json.dump(dict(updated="test", errors=errors, **payload), open("out/fundamentals.json", "w"), separators=(",", ":"))
 print("size", os.path.getsize("out/fundamentals.json"))
+import base64, gzip
+b = base64.b64encode(gzip.compress(open("out/fundamentals.json", "rb").read())).decode()
+print("B64START")
+for i in range(0, len(b), 20000):
+    print("B64:" + b[i:i + 20000])
+print("B64END")

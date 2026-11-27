@@ -475,7 +475,7 @@ def fetch_all(fred_key, old=None):
             else:
                 raise RuntimeError(f"unknown source {kind}")
             pts = transform(pts, ind["tf"])
-            pts = [[d, round(v, 4)] for d, v in pts if d >= START]
+            pts = [[d, round(v, 3)] for d, v in pts if d >= START]
             if len(pts) < 2:
                 raise RuntimeError("no data returned")
             raw[ind["id"]] = pts
