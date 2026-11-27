@@ -2,7 +2,7 @@ name: probe (temporary)
 on:
   push:
     branches: [claude/fundamentals]
-    paths: [scripts/probe.py, .github/workflows/probe.yml]
+    paths: [scripts/probe.py, scripts/fundamentals.py, .github/workflows/probe.yml]
 jobs:
   probe:
     runs-on: ubuntu-latest
@@ -11,3 +11,7 @@ jobs:
       - run: python scripts/probe.py
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fundamentals
+          path: out/fundamentals.json
