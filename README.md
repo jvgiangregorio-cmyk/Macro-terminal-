@@ -19,6 +19,7 @@ A personal markets dashboard (rates, FX, equities, commodities, economic data an
 | This week's economic calendar (forecast, previous) | Forex Factory public feed (no key) | every 30 min |
 | Big-company earnings dates | Finnhub (`FINNHUB_API_KEY` secret) | hourly |
 | Later US release dates | FRED | hourly |
+| Fundamentals: GDP, inflation, jobs, wages, retail sales, confidence surveys, trade, policy rates and 10-year yields for USD, EUR, GBP, JPY, CHF, CAD, AUD and NZD since 2000 | FRED, ONS (via DBnomics), ECB, Statistics Bureau of Japan (via DBnomics), SNB, Statistics Canada, RBA, OECD and BIS; only FRED needs a key (see `scripts/fundamentals.py`) | every 6 hours |
 
 ## The API keys
 
