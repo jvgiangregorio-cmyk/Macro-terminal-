@@ -1,69 +1,43 @@
 """Temporary: check which candidate series exist and are current. Removed before merge."""
-import json, os, urllib.request, urllib.parse, sys
-KEY = os.environ.get("FRED_API_KEY", "")
+import csv, io, json, os, urllib.request, urllib.parse, collections
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
-def get(url, t=40):
-    r = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
+def get(url, t=60, data=None, hdr=None):
+    h = {"User-Agent": UA, "Accept": "*/*"}; h.update(hdr or {})
+    r = urllib.request.Request(url, headers=h, data=data)
     with urllib.request.urlopen(r, timeout=t) as f: return f.read()
-def fred(ids):
-    for i in ids:
-        try:
-            s = json.loads(get("https://api.stlouisfed.org/fred/series?" + urllib.parse.urlencode({"series_id": i, "api_key": KEY, "file_type": "json"})))["seriess"][0]
-            print(f"FRED {i:24s} {s['observation_start']}..{s['observation_end']} {s['frequency_short']} {s['seasonal_adjustment_short']} | {s['title'][:90]} [{s['units_short']}]")
-        except Exception as e: print(f"FRED {i:24s} ERR {str(e)[:60]}")
-def fredsearch(q, n=8):
+def oecd(label, url, keys):
     try:
-        d = json.loads(get("https://api.stlouisfed.org/fred/series/search?" + urllib.parse.urlencode({"search_text": q, "api_key": KEY, "file_type": "json", "limit": n, "order_by": "popularity", "sort_order": "desc"})))
-        print(f"## FREDSEARCH {q}")
-        for s in d["seriess"]: print(f"   {s['id']:26s} ..{s['observation_end']} {s['frequency_short']} {s['seasonal_adjustment_short']} | {s['title'][:80]} [{s['units_short']}]")
-    except Exception as e: print(f"## FREDSEARCH {q} ERR {e}")
-def dbn(ids):
-    for i in ids:
-        try:
-            d = json.loads(get("https://api.db.nomics.world/v22/series/" + i + "?observations=1&format=json"))
-            s = d["series"]["docs"][0]
-            p = s.get("period", [])
-            print(f"DBN  {i:50s} {p[0] if p else ''}..{p[-1] if p else ''} n={len(p)} | {s.get('series_name','')[:80]}")
-        except Exception as e: print(f"DBN  {i:50s} ERR {str(e)[:60]}")
-def dbq(ds, q, n=12):
-    try:
-        d = json.loads(get("https://api.db.nomics.world/v22/series/" + ds + "?" + urllib.parse.urlencode({"q": q, "limit": n, "observations": 0, "format": "json"})))
-        docs = d["series"]["docs"]
-        print(f"## DBQ {ds} q={q} total={d['series'].get('num_found')}")
-        for s in docs: print(f"   {s['series_code']:45s} {s.get('indexed_at','')[:10]} | {s.get('series_name','')[:100]}")
-    except Exception as e: print(f"## DBQ {ds} q={q} ERR {str(e)[:80]}")
-def dbsearch(q, n=10):
-    try:
-        d = json.loads(get("https://api.db.nomics.world/v22/search?" + urllib.parse.urlencode({"q": q, "limit": n})))
-        print(f"## DBSEARCH {q}")
-        for r in d["results"]["docs"]: print(f"   {r.get('provider_code')}/{r.get('code')} nb={r.get('nb_series')} upd={str(r.get('indexed_at',''))[:10]} | {r.get('name','')[:80]}")
-    except Exception as e: print(f"## DBSEARCH {q} ERR {str(e)[:80]}")
-def raw(url):
-    try: b = get(url); print(f"RAW OK {len(b)} {url[:100]}\n   {b[:300]!r}")
-    except Exception as e: print(f"RAW ERR {url[:100]} {str(e)[:80]}")
-
-fred("GDPC1 A191RL1Q225SBEA CPIAUCSL CPILFESL PCEPILFE UNRATE PAYEMS RSAFS RSFSXMV CES0500000003 BOPGSTB INDPRO UMCSENT ICSA HOUST JTSJOL DFF DGS10".split())
-cc = {"GB":"GBR","JP":"JPN","DE":"DEU","EZ":"EA19","CA":"CAN","AU":"AUS","NZ":"NZL","CH":"CHE"}
-for c in ["GB","JP","CA","AU","NZ","CH","EZ"]:
-    fred([f"CPALTT01{c}M659N", f"LRHUTTTT{c}M156S", f"IRLTLT01{c}M156N", f"IR3TIB01{c}M156N", f"SLRTTO01{c}M657S", f"BSCICP03{c}M665S", f"CSCICP03{c}M665S", f"LOLITOAA{c}M156N", f"XTEXVA01{c}M667S", f"NAEXKP01{c}Q657S"])
-fred(["CLVMNACSCAB1GQUK","CLVMNACSCAB1GQEA19","CLVMEURSCAB1GQEA19","JPNRGDPEXP","NGDPRSAXDCCAQ","NGDPRSAXDCAUQ","NZLRGDPEXP","CLVMNACSCAB1GQCH","ECBDFR","IRSTCI01JPM156N","INTDSRJPM193N","CP0000EZ19M086NEST","CPHPTT01EZM659N","EA19CPHPLA01GYM"])
-for q in ["United Kingdom retail sales","Japan CPI","Canada unemployment rate","Australia CPI","New Zealand unemployment","Switzerland CPI","Euro area unemployment","Japan retail","Canada retail sales","Switzerland unemployment","policy rate Bank of Japan","BIS central bank policy rate"]:
-    fredsearch(q)
-for q in ["ONS retail sales","Statistics Canada consumer price","ABS consumer price index","Stats NZ","Swiss consumer price","Japan consumer price index","BIS central bank policy rates","Eurostat HICP monthly","OECD key short-term economic indicators","Statistics Bureau Japan labour force"]:
-    dbsearch(q)
-dbn(["ONS/MM23/D7G7.M","ONS/MM23/DKO8.M","ONS/DRSI/J5EK.M","ONS/DRSI/J5EB.M","ONS/LMS/MGSX.M","ONS/LMS/KAC3.M","ONS/QNA/IHYQ.Q","ONS/QNA/ABMI.Q",
-     "ECB/ICP/M.U2.N.000000.4.ANR","ECB/ICP/M.U2.N.XEF000.4.ANR","ECB/FM/D.U2.EUR.4F.KR.DFR.LEV","ECB/FM/B.U2.EUR.4F.KR.DFR.LEV",
-     "Eurostat/une_rt_m/M.SA.TOTAL.PC_ACT.T.EA20","Eurostat/prc_hicp_manr/M.RCH_A.CP00.EA","Eurostat/namq_10_gdp/Q.CLV_PCH_PRE.SCA.B1GQ.EA20","Eurostat/sts_trtu_m/M.VOL_SLS.G47.SCA.I21.EA20",
-     "BIS/WS_CBPOL/M.GB","BIS/WS_CBPOL/D.JP","BIS/WS_CBPOL/M.CH"])
-for ds,q in [("ONS/DRSI","volume seasonally adjusted"),("ONS/MM23","annual rate"),("ONS/LMS","unemployment rate"),("ONS/LMS","average weekly earnings"),("ONS/QNA","gross domestic product chained volume"),("ONS/MRET","volume"),
-             ("BIS/WS_CBPOL",""),("Eurostat/sts_trtu_m","EA20 volume retail"),("Eurostat/une_rt_m","EA20 SA total percentage active"),
-             ("STATCAN/18100004",""),("ABS/CPI","all groups")]:
-    dbq(ds,q)
-raw("https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,1.0/GBR+JPN.M.N.CPI.PA._T.N.GY?startPeriod=2025-01&format=csvfilewithlabels")
-raw("https://www150.statcan.gc.ca/t1/wds/rest/getDataFromVectorsAndLatestNPeriods")
-raw("https://www.ons.gov.uk/generator?format=csv&uri=/businessindustryandtrade/retailindustry/timeseries/j5ek/drsi")
-raw("https://api.beta.ons.gov.uk/v1/datasets")
-raw("https://data-api.ecb.europa.eu/service/data/ICP/M.U2.N.000000.4.ANR?format=csvdata&lastNObservations=2")
-raw("https://data.snb.ch/api/cube/snbgwdzid/data/csv/en")
-raw("https://www.rba.gov.au/statistics/tables/csv/g1-data.csv")
-raw("https://www.rbnz.govt.nz/-/media/project/sites/rbnz/files/statistics/series/b/b2/hb2-daily.xlsx")
+        b = get(url).decode("utf-8-sig")
+        rows = list(csv.DictReader(io.StringIO(b)))
+        last = {}
+        for r in rows:
+            k = tuple(r.get(x, "") for x in keys)
+            if k not in last or r["TIME_PERIOD"] > last[k][0]: last[k] = (r["TIME_PERIOD"], r["OBS_VALUE"])
+        print(f"## OECD {label} rows={len(rows)} cols={list(rows[0].keys())[:30] if rows else ''}")
+        for k, v in sorted(last.items()): print("   ", " | ".join(k), "->", v)
+    except Exception as e: print(f"## OECD {label} ERR {str(e)[:200]}")
+A = "USA+GBR+EA20+JPN+CHE+CAN+AUS+NZL"
+oecd("KEI", f"https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_KEI@DF_KEI,/{A}.......?startPeriod=2025-01&format=csvfile", ["REF_AREA","FREQ","MEASURE","UNIT_MEASURE","ACTIVITY","ADJUSTMENT","TRANSFORMATION"])
+oecd("PRICES", f"https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,/{A}..N.CPI.PA._T+_TXCP01_NRG.N.GY?startPeriod=2025-01&format=csvfile", ["REF_AREA","FREQ","METHODOLOGY","EXPENDITURE","TRANSFORMATION"])
+oecd("BCICCI", f"https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,/{A}.M.BCICP+CCICP+LI...AA...?startPeriod=2025-01&format=csvfile", ["REF_AREA","MEASURE","ADJUSTMENT","METHODOLOGY"])
+oecd("UNEMP", f"https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_LFS@DF_IALFS_UNE_M,/{A}..._Z.Y._T.Y_GE15..M+Q?startPeriod=2025-01&format=csvfile", ["REF_AREA","FREQ","MEASURE","UNIT_MEASURE","ADJUSTMENT"])
+oecd("QNA", f"https://sdmx.oecd.org/public/rest/data/OECD.SDD.NAD,DSD_NAMAIN1@DF_QNA,/Q..{A}.S1..B1GQ._Z...USD_PPP+XDC.LR.GY+G1.?startPeriod=2025-Q1&format=csvfile", ["REF_AREA","TRANSACTION","UNIT_MEASURE","PRICE_BASE","TRANSFORMATION","ADJUSTMENT"])
+def raw(url, n=400, **kw):
+    try: b = get(url, **kw); print(f"RAW OK {len(b)} {url[:140]}\n   {b[:n]!r}\n   ...{b[-300:]!r}")
+    except Exception as e: print(f"RAW ERR {url[:140]} {str(e)[:120]}")
+raw("https://stats.bis.org/api/v2/data/dataflow/BIS/WS_CBPOL/1.0/D.US+GB+JP+CH+CA+AU+NZ+XM?startPeriod=2026-10-01&format=csv", 300)
+for k in ["LFSI/M.I9.S.UNEHRT.TOTAL0.15_74.T","STS/M.I9.Y.TOVT.3.G47.3.INX","STS/M.I9.Y.TOVV.4000.4.ANR","MNA/Q.Y.I9.W2.S1.S1.B.B1GQ._Z._Z._Z.EUR.LR.GY","MNA/Q.Y.I9.W2.S1.S1.B.B1GQ._Z._Z._Z.EUR.LR.GO","STS/M.I9.Y.PROD.NS0020.4.000","ICP/M.U2.N.XEF000.4.ANR","ICP/M.U2.N.000000.4.ANR","FM/D.U2.EUR.4F.KR.DFR.LEV","FM/M.U2.EUR.4F.BB.U2_10Y.YLD","YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y","BP6/M.N.I9.W1.S1.S1.T.B.G._Z._Z._Z.EUR._T._X.N","MNA/Q.Y.I9.W0.S1.S1._Z.COM_HW._Z._T._Z.IX.V.N","STS/M.I9.S.UNEH.RTT000.4.000"]:
+    raw(f"https://data-api.ecb.europa.eu/service/data/{k}?format=csvdata&lastNObservations=1&detail=dataonly", 50)
+raw("https://www150.statcan.gc.ca/t1/wds/rest/getDataFromVectorsAndLatestNPeriods", 1500, data=json.dumps([{"vectorId": v, "latestN": 1} for v in [41690973, 41690914, 108785713, 2062815, 2062811, 52367097, 65201210, 1235044, 87552811, 80691311]]).encode(), hdr={"Content-Type": "application/json"})
+raw("https://api.data.abs.gov.au/data/ABS,CPI_M,1.0.0/all?startPeriod=2026-08&detail=serieskeysonly&format=csvfilewithlabels", 600)
+raw("https://api.data.abs.gov.au/data/ABS,LF,1.0.0/M13.3.1599.20.AUS.M?startPeriod=2026-06&format=csv", 600)
+raw("https://www.stat-search.boj.or.jp/api/v1/getDataCode?format=json&lang=en&db=IR01&code=MADR1M&startDate=202501", 600)
+raw("https://www.rba.gov.au/statistics/tables/csv/f1.1-data.csv", 200)
+raw("https://www.rbnz.govt.nz/statistics/series/exchange-and-interest-rates/interest-rates", 200, hdr={"Accept": "text/html", "Accept-Language": "en-GB"})
+raw("https://data.snb.ch/api/cube/snbgwdzid/data/csv/en?fromDate=2026-11-01", 600)
+raw("https://data.snb.ch/api/cube/plkopr/data/csv/en?fromDate=2026-06", 600)
+for cdid, ds, path in [("J5EK","drsi","businessindustryandtrade/retailindustry"),("J5EL","drsi","businessindustryandtrade/retailindustry"),("J5BE","drsi","businessindustryandtrade/retailindustry"),("J5C4","drsi","businessindustryandtrade/retailindustry"),
+                       ("D7G7","mm23","economy/inflationandpriceindices"),("DKO8","mm23","economy/inflationandpriceindices"),("D7NN","mm23","economy/inflationandpriceindices"),
+                       ("MGSX","lms","employmentandlabourmarket/peoplenotinwork/unemployment"),("KAC3","lms","employmentandlabourmarket/peopleinwork/earningsandworkinghours"),("KAI9","lms","employmentandlabourmarket/peopleinwork/earningsandworkinghours"),
+                       ("IHYQ","qna","economy/grossdomesticproductgdp"),("ECY2","mgdp","economy/grossdomesticproductgdp"),("IKBJ","mret","economy/nationalaccounts/balanceofpayments"),("K222","diop","economy/economicoutputandproductivity/output"),("LZVB","lms","employmentandlabourmarket/peopleinwork/employmentandemployeetypes"),("AP2Y","lms","employmentandlabourmarket/peopleinwork/employmentandemployeetypes")]:
+    raw(f"https://www.ons.gov.uk/generator?format=csv&uri=/{path}/timeseries/{cdid.lower()}/{ds}", 120)
