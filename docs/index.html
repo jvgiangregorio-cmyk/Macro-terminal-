@@ -147,6 +147,20 @@ details.tbl table{margin-top:6px;max-width:360px}
 .lib a{color:var(--text)}
 .lib .meta{display:block;font-size:11.5px;color:var(--faint)}
 .lib p{color:var(--faint);font-size:12px;margin:10px 0 0;line-height:1.5}
+/* Claude's notes */
+.ai{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.ai h3{font-size:13px;font-weight:600;margin:0 0 6px;color:var(--muted)}
+.ai .lead{font-size:15px;font-weight:500;line-height:1.45;margin:0 0 10px}
+.ai p{font-size:13.5px;line-height:1.55;margin:0 0 9px}
+.ai p b{font-weight:600}
+.ai ul{margin:0 0 8px;padding-left:18px;font-size:13.5px;line-height:1.5}
+.ai .mv{border-bottom:1px solid var(--grid);padding:6px 0;font-size:13.5px;line-height:1.5}
+.ai .mv:last-child{border-bottom:0}
+.ai .mv .num{font-weight:500}
+.ai .by{font-size:11.5px;color:var(--faint);margin-top:6px}
+.news .take{display:block;font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.45}
+.news .take::before{content:"Claude: ";font-weight:600}
+@media (max-width:1100px){.ai{grid-template-columns:1fr}}
 footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
 @media (max-width:1100px){.grid{grid-template-columns:1fr}}
 @media (max-width:520px){.chart{height:240px}.ranges{margin-left:0}.hdr-right{margin-left:0}}
@@ -163,6 +177,15 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
   </header>
   <div class="tape" id="tvTape" aria-label="Live ticker tape"></div>
   <div id="banner"></div>
+
+  <section class="panel" aria-label="Claude's market notes" style="margin-bottom:14px">
+    <h2>Claude's market notes <span>written by AI from the data on this page · can be wrong · not investment advice</span></h2>
+    <div class="upd" data-src="claude"></div>
+    <div class="ai">
+      <div id="aiBrief"></div>
+      <div id="aiMoves"></div>
+    </div>
+  </section>
 
   <div class="grid">
     <div class="col">
@@ -255,7 +278,7 @@ footer{color:var(--faint);font-size:12px;margin-top:18px;line-height:1.6}
 
   <footer>
     Prices: Twelve Data (currencies, gold and bitcoin every 20 minutes on weekdays; ETFs every 15 minutes in US market hours). Rates, spreads and economic data: FRED, Federal Reserve Bank of St. Louis (usually one business day behind). Futures positioning: CFTC Commitments of Traders, legacy futures-only report (released Fridays for the prior Tuesday). UK rates and sterling: Bank of England. Calendars and some headlines: Finnhub. Other headlines and research: publishers' RSS feeds (headlines and links only; the reports stay on the publishers' sites).
-    The data refreshes on GitHub every 10 minutes (each source on its own timer, shown under each panel in UK time) and this page re-reads it every 2 minutes. Economic calendar: Forex Factory. Live chart, ticker tape and bond yields: TradingView widgets. Not investment advice.
+    The data refreshes on GitHub every 10 minutes (each source on its own timer, shown under each panel in UK time) and this page re-reads it every 2 minutes. Economic calendar: Forex Factory. Live chart, ticker tape and bond yields: TradingView widgets. Market notes and research takes: written by Claude (Anthropic) from the data above, so they can contain mistakes. Not investment advice.
   </footer>
 </div>
 
@@ -269,7 +292,7 @@ const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls)
 const SVGNS = "http://www.w3.org/2000/svg";
 const sv = (tag, attrs) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); return e; };
 
-let D = { prices: null, hist: null, fred: null, news: null, research: null, cot: null, boe: null, cal: null, ff: null, status: null };
+let D = { prices: null, hist: null, fred: null, news: null, research: null, cot: null, boe: null, cal: null, ff: null, status: null, claude: null };
 let selected = { kind: "td", id: "SPY" };
 let range = "1Y";
 let newsFilter = "All";
@@ -428,9 +451,10 @@ const ukTime = iso => {
   return day === today ? t : day + " " + t;
 };
 const SRC_LABEL = { prices_fx: "FX, gold & bitcoin", prices_us: "ETFs", fred: "FRED", boe: "Bank of England", cot: "CFTC",
-  news: "RSS feeds", research: "research feeds", finnhub_news: "Finnhub", calendar: "earnings & US dates", forexfactory: "Forex Factory", price_history: "price history" };
+  news: "RSS feeds", research: "research feeds", finnhub_news: "Finnhub", calendar: "earnings & US dates", forexfactory: "Forex Factory", price_history: "price history", claude: "Claude's notes" };
 const SRC_EVERY = { prices_fx: "every 20 min on weekdays", prices_us: "every 15 min in US market hours", fred: "every 30 min", boe: "every 30 min",
-  cot: "every 10 min (new report weekly)", news: "every 10 min", research: "hourly", finnhub_news: "every 10 min", calendar: "hourly", forexfactory: "every 30 min", price_history: "daily" };
+  cot: "every 10 min (new report weekly)", news: "every 10 min", research: "hourly", finnhub_news: "every 10 min", calendar: "hourly", forexfactory: "every 30 min", price_history: "daily",
+  claude: "every 10 min (brief once each weekday morning, 'what moved' at most hourly when prices change, research takes when new research arrives)" };
 function stampNode(srcs) {
   const st = D.status && D.status.sources || {};
   const box = el("div", "upd");
@@ -820,6 +844,8 @@ function drawResearch() {
     if (/^https:\/\//.test(i.link)) { const a = el("a", "", i.title); a.href = i.link; a.target = "_blank"; a.rel = "noopener noreferrer"; li.append(a); }
     else li.append(el("span", "", i.title));
     li.append(el("span", "meta", i.source + (i.published ? " · " + relTime(i.published) : "")));
+    const take = D.claude && D.claude.takes && D.claude.takes[i.link + "|" + i.title];
+    if (take) li.append(el("span", "take", take));
     ul.append(li);
   });
 }
@@ -830,6 +856,31 @@ function drawLibrary() {
     li.append(a, el("span", "meta", what));
     return li;
   }));
+}
+
+// ---------- Claude's notes
+const MODEL_NAME = m => (m || "").replace(/^claude-/, "Claude ").replace(/-(\d+)-(\d+)$/, " $1.$2").replace(/-(\d+)$/, " $1").replace(/(opus|sonnet|haiku|fable)/, w => w[0].toUpperCase() + w.slice(1));
+function byLine(n) { return el("div", "by", "Written by " + MODEL_NAME(n.model) + ", " + ukTime(n.generated) + " UK time (" + relTime(n.generated) + ")"); }
+function drawClaude() {
+  const c = D.claude, b = $("aiBrief"), m = $("aiMoves");
+  b.replaceChildren(el("h3", "", "Morning brief")); m.replaceChildren(el("h3", "", "What moved and why"));
+  if (!c) {
+    b.append(el("p", "empty", "Claude's notes start once an Anthropic API key is saved in the repository's Secrets as ANTHROPIC_API_KEY."));
+    return;
+  }
+  const br = c.brief;
+  if (br && br.headline) {
+    b.append(el("p", "lead", br.headline));
+    (br.points || []).forEach(p => { const x = el("p"); x.append(el("b", "", p.title + ". "), document.createTextNode(p.text)); b.append(x); });
+    if ((br.watch || []).length) { b.append(el("h3", "", "Watch")); const ul = el("ul"); br.watch.forEach(w => ul.append(el("li", "", w))); b.append(ul); }
+    b.append(byLine(br));
+  } else b.append(el("p", "empty", "The first brief arrives with the next refresh."));
+  const mv = c.moves;
+  if (mv && mv.headline) {
+    m.append(el("p", "lead", mv.headline));
+    (mv.moves || []).forEach(x => { const d = el("div", "mv"); d.append(el("b", "", x.market + " "), el("span", "num", x.move), document.createTextNode(". " + x.why)); m.append(d); });
+    m.append(byLine(mv));
+  } else m.append(el("p", "empty", "Appears once prices have moved."));
 }
 
 // ---------- header + problems
@@ -862,7 +913,7 @@ function drawRanges() {
 
 function renderAll() {
   hideTip();
-  drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawCot(); drawRates(); drawUK(); drawCalendar(); drawStamps(); drawCurve(); drawEcon(); drawNews(); drawResearch();
+  drawHeader(); drawRanges(); drawMain(); drawMarkets(); drawCot(); drawRates(); drawUK(); drawCalendar(); drawStamps(); drawCurve(); drawEcon(); drawNews(); drawResearch(); drawClaude();
 }
 
 // ---------- loading
@@ -871,9 +922,9 @@ async function getJSON(name) {
   catch (e) { return null; }
 }
 async function load() {
-  const names = ["prices", "price_history", "fred", "news", "research", "cot", "boe", "calendar", "ff", "status"];
+  const names = ["prices", "price_history", "fred", "news", "research", "cot", "boe", "calendar", "ff", "status", "claude"];
   const got = await Promise.all(names.map(n => getJSON(n + ".json")));
-  const keys = ["prices", "hist", "fred", "news", "research", "cot", "boe", "cal", "ff", "status"];
+  const keys = ["prices", "hist", "fred", "news", "research", "cot", "boe", "cal", "ff", "status", "claude"];
   const next = {}; keys.forEach((k, i) => next[k] = got[i] || D[k]); D = next;
   renderAll();
 }

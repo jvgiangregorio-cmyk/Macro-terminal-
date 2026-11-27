@@ -42,11 +42,16 @@ jobs:
           key: data-${{ github.run_id }}
           restore-keys: data-
 
+      # The Anthropic library, used to ask Claude for the market notes.
+      - name: Install Claude library
+        run: pip install --quiet "anthropic==2.14.0"
+
       - name: Fetch fresh data
         env:
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python scripts/refresh.py ${{ github.event_name == 'workflow_dispatch' && '--all' || '' }}
 
       - name: Keep data for next run

@@ -12,6 +12,7 @@ Sources
   CFTC         Commitments of Traders futures positioning (no key needed)
   RSS feeds    headlines (no key needed)
   Research     public research and commentary feeds from banks (no key needed)
+  Claude       morning brief, "what moved and why", research takes (claude_notes.py)
 
 GitHub starts this every 10 minutes. Each source has its own timer (SCHEDULE
 below) so nobody's limits are hit, and docs/data/status.json records when each
@@ -38,6 +39,8 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+import claude_notes
 
 DATA = Path(__file__).resolve().parent.parent / "docs" / "data"
 UA = "macro-terminal/1.0 (personal dashboard)"
@@ -75,6 +78,7 @@ SCHEDULE = {
     "research": 60,       # bank research feeds publish a few times a day at most
     "calendar": 60,       # earnings dates + US release dates
     "forexfactory": 30,   # Forex Factory asks people not to poll it often
+    "claude": 10,         # Claude's notes; each note has its own rule in claude_notes.py
 }
 US_SESSION_UTC = (13 * 60 + 30, 21 * 60 + 15)   # minutes after midnight UTC (covers summer and winter time)
 TD_BATCH = 8          # free plan: 8 calls per minute
@@ -267,7 +271,7 @@ def run_source(source, fn, *args):
             st["changed"] = st["checked"]
     except Exception as e:  # noqa: BLE001
         msg = str(e)[:200]
-        for k in (os.environ.get(v, "") for v in ("TWELVEDATA_API_KEY", "FRED_API_KEY", "FINNHUB_API_KEY")):
+        for k in (os.environ.get(v, "") for v in ("TWELVEDATA_API_KEY", "FRED_API_KEY", "FINNHUB_API_KEY", "ANTHROPIC_API_KEY")):
             msg = hide_key(msg, k)
         print(f"  {source} failed: {msg}")
         st["ok"] = False
@@ -811,6 +815,12 @@ def main():
         run_source("news", fetch_news, fh_news)
     if due("research", force) or load("research.json") is None:
         run_source("research", fetch_research)
+
+    # --- Claude's commentary, last so it sees the freshest data
+    if not os.environ.get("ANTHROPIC_API_KEY", "").strip():
+        print("ANTHROPIC_API_KEY is not set: skipping Claude's notes. Add it under Settings > Secrets.")
+    elif due("claude", force):
+        run_source("claude", claude_notes.run, load, save, now_utc(), force)
 
     DATA.mkdir(parents=True, exist_ok=True)
     (DATA / "status.json").write_text(json.dumps({"run": iso(t), "sources": STATUS}, separators=(",", ":")))

@@ -20,6 +20,7 @@ A personal markets dashboard (rates, FX, equities, commodities, economic data an
 | Big-company earnings dates, market news | Finnhub (`FINNHUB_API_KEY` secret) | news every 10 min, earnings hourly |
 | Later US release dates | FRED | hourly |
 | Headlines | Fed, ECB, MarketWatch, CNBC, BBC RSS feeds | every 10 min |
+| Market notes: morning brief, "what moved and why", one-line takes on research | Claude, Anthropic's AI (`ANTHROPIC_API_KEY` secret) | brief once each weekday after 06:30 UK time; "what moved" at most hourly, only when prices changed; takes once per new research item |
 | Research | Public research feeds: ING Think, Nordea, WSJ, Goldman Sachs podcast, Fed Beige Book, FactSet Insight, Syz (headlines and links only), plus a library of links to other banks' free research pages | hourly |
 
 ## The API keys
@@ -29,12 +30,22 @@ The keys are stored as **repository secrets** (Settings → Secrets and variable
 - `TWELVEDATA_API_KEY`
 - `FRED_API_KEY`
 - `FINNHUB_API_KEY`
+- `ANTHROPIC_API_KEY` (from console.anthropic.com; needs prepaid credit)
 
 They are never written into the code, the data files or the website. To change a key, open the secret and click **Update**.
 
 ## Free-plan limits
 
 Twelve Data's free plan allows 800 calls a day and 8 a minute; each symbol is one call. The schedule uses about 650 a day. If you add symbols in `TD_SYMBOLS` (top of `scripts/refresh.py`), slow their timer in `SCHEDULE` to stay under 800.
+
+## Claude's notes and what they cost
+
+`scripts/claude_notes.py` asks Claude for the notes, and only when something changed, so a typical month costs about $1 to $3:
+
+- Morning brief: Claude Opus 5.5, one call each weekday (a few US cents each).
+- "What moved and why" and research takes: Claude Haiku 5.5, which costs a fraction of a cent per call.
+
+The script keeps a running cost estimate in `docs/data/claude.json` and stops asking Claude for the rest of the month if it passes `MONTHLY_BUDGET_USD` ($5), or after `MAX_CALLS_PER_DAY` calls in a day. You can also set a spending limit in the Anthropic Console (Settings → Limits). The models and timings are at the top of `scripts/claude_notes.py`. Without the secret, the page simply shows a note and everything else works as before.
 
 ## Refresh by hand
 
