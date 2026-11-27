@@ -751,7 +751,7 @@ function drawHeader() {
   const run = D.status && D.status.run;
   s.append(document.createTextNode("Last refresh run "), el("b", "", run ? ukTime(run) + " UK time" : "not yet"),
            document.createTextNode(run ? " (" + relTime(run) + ")" : ""));
-  const stale = run && Date.now() - new Date(run) > 45 * 60000;
+  const stale = run && Date.now() - new Date(run) > 75 * 60000;
   const errs = [];
   [["Twelve Data prices", D.prices], ["Twelve Data history", D.hist], ["FRED", D.fred], ["Bank of England", D.boe]].forEach(([n, d]) => (d && d.errors || []).forEach(e => errs.push(n + ": " + e)));
   const bad = (D.prices && D.prices.quotes || []).filter(q => q.error).map(q => q.symbol);
@@ -761,7 +761,7 @@ function drawHeader() {
     const box = el("div", "banner", "No data yet. The first automatic refresh fills this page. You can start one now from the repository's Actions tab: Refresh market data, then Run workflow.");
     b.append(box);
   } else if (stale) {
-    b.append(el("div", "banner", "The automatic refresh hasn't run for " + relTime(run).replace(" ago", "") + ". GitHub sometimes pauses scheduled jobs; check the repository's Actions tab."));
+    b.append(el("div", "banner", "The automatic refresh hasn't run for " + relTime(run).replace(" ago", "") + ". GitHub sometimes delays scheduled jobs and it usually catches up on its own; if this lasts for hours, check the repository's Actions tab."));
   } else if (errs.length) {
     const box = el("div", "banner"); box.append(el("strong", "", "Some data didn't refresh last time.")); const ul = el("ul"); errs.slice(0, 6).forEach(e => ul.append(el("li", "", e))); box.append(ul); b.append(box);
   }

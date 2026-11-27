@@ -2,11 +2,18 @@ name: Refresh market data
 
 on:
   schedule:
-    # Every 10 minutes (UTC). GitHub sometimes starts runs a few minutes late.
+    # Every 10 minutes (UTC). In practice GitHub often starts these only about
+    # once an hour, so each run also queues the next one itself (last step).
     # Each data source has its own timer inside scripts/refresh.py, so
     # Twelve Data stays inside its free 800-calls-a-day limit.
     - cron: "*/10 * * * *"
   workflow_dispatch:      # adds a "Run workflow" button on the Actions tab
+    inputs:
+      mode:
+        description: "all = fetch everything now; chain = normal scheduled refresh"
+        default: all
+        type: choice
+        options: [all, chain]
   push:
     branches: [main]
 
@@ -14,6 +21,7 @@ permissions:
   contents: read
   pages: write      # to publish the website
   id-token: write
+  actions: write    # to queue the next run
 
 concurrency:
   group: refresh
@@ -22,11 +30,14 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url || steps.deploy2.outputs.page_url }}
     steps:
+      - name: Note the start time
+        run: echo "STARTED=$(date +%s)" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@v5
 
       - uses: actions/setup-python@v6
@@ -47,7 +58,7 @@ jobs:
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
-        run: python scripts/refresh.py ${{ github.event_name == 'workflow_dispatch' && '--all' || '' }}
+        run: python scripts/refresh.py ${{ github.event_name == 'workflow_dispatch' && inputs.mode != 'chain' && '--all' || '' }}
 
       - name: Keep data for next run
         if: always()
@@ -84,3 +95,23 @@ jobs:
       - name: Note if publishing was skipped
         if: steps.deploy.outcome == 'failure' && steps.deploy2.outcome == 'failure'
         run: echo "::warning::GitHub Pages didn't accept the update this time. The next run will publish it."
+
+      # GitHub's 10-minute schedule is best-effort and often runs only hourly.
+      # So wait until about 10 minutes after this run started, then queue the
+      # next run, unless one is already waiting. If this chain ever breaks,
+      # the next scheduled run starts it again.
+      - name: Queue the next refresh
+        if: always() && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          wait=$(( 570 - ($(date +%s) - STARTED) ))
+          if [ "$wait" -gt 0 ]; then sleep "$wait"; fi
+          waiting=$(gh run list -R "$GITHUB_REPOSITORY" -w refresh.yml -L 20 --json status \
+            --jq '[.[] | select(.status == "queued" or .status == "pending" or .status == "waiting" or .status == "requested")] | length')
+          if [ "$waiting" = "0" ]; then
+            gh workflow run refresh.yml -R "$GITHUB_REPOSITORY" --ref main -f mode=chain
+            echo "Queued the next refresh."
+          else
+            echo "A refresh is already waiting; not queueing another."
+          fi
